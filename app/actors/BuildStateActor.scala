@@ -13,18 +13,34 @@ object BuildStateActor {
   case class BuildFailed(jobName: String, buildsSinceLastSuccess: Int, authors: HashSet[String]) extends BuildStateMessage
   case class SubscribeToStateDataChanges(actorRef: ActorRef) extends BuildStateMessage
 
+  // sent events
+
+  case class BuildStateNotification(state: State, data: BuildStateData)
+
   // states
-  sealed trait State
-  case object Unknown extends State
-  case object Healthy extends State
-  case object JustFixed extends State
-  case object JustBroken extends State
-  case object StillBroken extends State
+  sealed trait State {
+    def isWorking: Boolean;
+
+  }
+  case object Unknown extends State {
+    override def isWorking = throw new UnsupportedOperationException();
+  }
+  case object Healthy extends State {
+    override def isWorking = true;
+  }
+  case object JustFixed extends State {
+    override def isWorking = true;
+
+  }
+  case object JustBroken extends State {
+    override def isWorking = false;
+
+  }
+  case object StillBroken extends State {
+    override def isWorking = false;
+  }
 
   sealed trait Data
-
-  abstract class BuildBrokenData(jobName: String) extends Data
-  abstract class BuildWorkingData(jobName: String) extends Data
 
   case object NoBuildStateData extends Data
   case class BuildStateData(jobName: String, buildsSinceLastStateChange: Int, stateChangeAuthors: Set[String], sinceStateChangeAuthors: Set[String]) extends Data {
@@ -45,11 +61,7 @@ class BuildStateActor extends Actor with FSM[State, Data] {
 
   when(Unknown) {
     case Event(BuildSucceeded(jobName, buildsSinceLastFailure, authors), NoBuildStateData) => {
-      if (buildsSinceLastFailure == 1) {
-        goto(JustFixed) using new BuildStateData(jobName, authors)
-      } else {
         goto(Healthy) using new BuildStateData(jobName, buildsSinceLastFailure)
-      }
     }
     case Event(BuildFailed(jobName, buildsSinceLastSuccess, authors), NoBuildStateData) => {
       if (buildsSinceLastSuccess == 1) {
@@ -115,7 +127,7 @@ class BuildStateActor extends Actor with FSM[State, Data] {
       val data = new BuildStateData(jobName, buildsSinceLastSuccess, oldBreakageAuthors, oldSinceBreakageAuthors ++ sinceBreakageAuthors)
 
       if (buildsSinceLastSuccess > oldBuildsSinceLastFailure) {
-        listeningActors.foreach(_ ! (StillBroken, data))
+        listeningActors.foreach(_ ! BuildStateNotification(StillBroken, data))
       }
       stay() using data
     }
@@ -136,7 +148,12 @@ class BuildStateActor extends Actor with FSM[State, Data] {
 
   onTransition {
     case oldState -> newState => {
-      listeningActors.foreach(_ ! (newState, nextStateData))
+      nextStateData match {
+        case bsd:BuildStateData => {
+          listeningActors.foreach(_ ! BuildStateNotification(newState, bsd))
+        }
+      }
+
     }
   }
 

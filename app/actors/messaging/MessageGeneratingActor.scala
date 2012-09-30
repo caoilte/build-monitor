@@ -5,10 +5,15 @@ import akka.util.duration._
 import akka.util.Timeout
 import akka.pattern.ask
 import actors.messaging.NameGeneratingActor.{NamesStringReply, NamesStringRequest}
-import actors.karotz.KarotzClientAdaptor.SpeechActionMessage
 import akka.actor.FSM.Transition
-import actors.BuildStateActor.{StillBroken, JustFixed, JustBroken, BuildStateData}
+import actors.BuildStateActor._
 import actors.PrioritisedMessageFunnel.{LowPriorityMessage, HighPriorityMessage}
+import actors.messaging.NameGeneratingActor.NamesStringRequest
+import actors.BuildStateActor.BuildStateData
+import actors.messaging.NameGeneratingActor.NamesStringReply
+import actors.PrioritisedMessageFunnel.HighPriorityMessage
+import actors.PrioritisedMessageFunnel.LowPriorityMessage
+import actors.karotz.KarotzClient.{KarotzMessage, SpeechAction}
 
 object MessageGeneratingActor {
   case class FormatMessage(formatMessage: String, args: String*)
@@ -19,24 +24,24 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
   implicit val timeout = Timeout(5 seconds)
 
   protected def receive = {
-    case (JustFixed, BuildStateData(jobName, buildsSinceLastStateChange, fixAuthors, sinceFixAuthors)) => {
+    case BuildStateNotification(JustFixed, BuildStateData(jobName, buildsSinceLastStateChange, fixAuthors, sinceFixAuthors)) => {
       namingActor ? NamesStringRequest(fixAuthors) map {
         case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(SpeechActionMessage("Attention. The "+jobName+" build has been fixed by "+authors))
+          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+jobName+" build has been fixed by "+authors)))
         }
       }
     }
 
-    case (JustBroken, BuildStateData(jobName, buildsSinceLastStateChange, breakageAuthors, sinceBreakageAuthors)) => {
+    case BuildStateNotification(JustBroken, BuildStateData(jobName, buildsSinceLastStateChange, breakageAuthors, sinceBreakageAuthors)) => {
       namingActor ? NamesStringRequest(breakageAuthors) map {
         case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(SpeechActionMessage("Attention. The "+jobName+" build has been broken by "+authors))
+          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+jobName+" build has been broken by "+authors)))
         }
       }
     }
 
 
-    case (StillBroken, BuildStateData(jobName, buildsSinceLastStateChange, breakageAuthors, sinceBreakageAuthors)) => {
+    case BuildStateNotification(StillBroken, BuildStateData(jobName, buildsSinceLastStateChange, breakageAuthors, sinceBreakageAuthors)) => {
       val breakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(breakageAuthors))
       val sinceBreakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(sinceBreakageAuthors))
 
@@ -44,10 +49,9 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
       for {
         NamesStringReply(breakageAuthorsString) <- breakageAuthorsStringFuture.mapTo[NamesStringReply]
         NamesStringReply(sinceBreakageAuthorsString) <- sinceBreakageAuthorsStringFuture.mapTo[NamesStringReply]
-      } yield funnel forward LowPriorityMessage(SpeechActionMessage(
+      } yield funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
         "Attention. The "+jobName+" build was broken by " + breakageAuthorsString + " and has failed "+ buildsSinceLastStateChange + " times since with " +
-          "checkins from " + sinceBreakageAuthorsString))
-
+          "checkins from " + sinceBreakageAuthorsString)))
     }
   }
 }

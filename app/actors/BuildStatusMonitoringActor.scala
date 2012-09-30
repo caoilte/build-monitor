@@ -7,28 +7,27 @@ import akka.util.duration._
 import actors.BuildStatusMonitoringActor.{GenerateBuildStateMessage, Tick}
 import akka.util.duration._
 import akka.util.Timeout
-import akka.pattern.ask
-import actors.HttpClientActor.{JsonReply, JsonQuery}
+import akka.pattern.{AskTimeoutException, ask}
 import java.net.{URLEncoder, URI}
 import actors.BuildStateActor.{BuildStateMessage, BuildFailed}
 import collection.immutable.HashSet
 import akka.dispatch.{Await, Future}
-import actors.HttpClientActor.JsonReply
 import config.JenkinsConfig
 import scala.Some
-import actors.HttpClientActor.JsonQuery
 import net.liftweb.json.JsonAST.JField
 import config.JobConfig
 import net.liftweb.json.JsonAST.JString
 import net.liftweb.json.JsonAST.JInt
 import actors.BuildStateActor.BuildStateMessage
 import com.typesafe.config.{ConfigFactory, Config}
+import actors.SprayHttpClientActor.{JsonQuery, JsonReply}
 ;
 
 
 object BuildStatusMonitoringActor {
   case object Tick
   case class GenerateBuildStateMessage(lastBuildJson: JValue, allBuildsJson: JValue)
+
 }
 
 class BuildStatusMonitoringActor(buildStateActor: ActorRef, httpClient: ActorRef, jenkinsConfig: JenkinsConfig, jobConfig: JobConfig)
@@ -119,14 +118,38 @@ class BuildStatusMonitoringActor(buildStateActor: ActorRef, httpClient: ActorRef
       val allBuildsFuture = ask(httpClient, JsonQuery(allBuildsUrl, jenkinsConfig.userName, jenkinsConfig.password))
       val lastBuildFuture = ask(httpClient, JsonQuery(lastBuildUrl, jenkinsConfig.userName, jenkinsConfig.password))
 
-      for {
+      val resultMessageFuture: Future[GenerateBuildStateMessage] = for {
         lastBuildJson <- lastBuildFuture.mapTo[JsonReply]
         allBuildsJson <- allBuildsFuture.mapTo[JsonReply]
-      } yield self ! GenerateBuildStateMessage(lastBuildJson.json, allBuildsJson.json)
+      } yield GenerateBuildStateMessage(lastBuildJson.json, allBuildsJson.json);
+
+      resultMessageFuture.onSuccess {
+        case message => {
+          self ! message
+        };
+      }
+      resultMessageFuture.onFailure {
+        case e:AskTimeoutException => {
+          log.error("Build Status Queries timed out after {}. Will schedule another check in 15 seconds.", timeout);
+
+          if (context != null) {
+            context.system.scheduler.scheduleOnce(15 seconds, self, Tick);
+          }
+        }
+        case e:Exception => {
+          e.printStackTrace()
+        };
+      }
     }
     case GenerateBuildStateMessage(lastBuildJson: JValue, allBuildsJson: JValue) => {
-      val buildStateMsg = createBuildStateMessage(lastBuildJson, allBuildsJson);
-      buildStateActor ! buildStateMsg
+      try {
+        val buildStateMsg = createBuildStateMessage(lastBuildJson, allBuildsJson);
+        buildStateActor ! buildStateMsg
+      } catch {
+        case e:Exception => {
+          e.printStackTrace()
+        };
+      }
 
       context.system.scheduler.scheduleOnce(2 minutes, self, Tick);
 

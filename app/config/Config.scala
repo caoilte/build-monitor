@@ -6,10 +6,6 @@ import scala.collection.JavaConversions._
 import collection.breakOut
 
 
-class HttpConfig(c: Config) {
-  val maxOutgoingConnections = c getInt "maxOutgoingConnections"
-  require(maxOutgoingConnections > 0)
-}
 
 class JenkinsConfig(c: Config) {
   val url = c getString "url"
@@ -44,7 +40,6 @@ class GlobalConfig(config: Config = ConfigFactory.load()) {
     c.getConfig("buildMonitor")
   }
 
-  val httpConfig = new HttpConfig(c getConfig "httpConfig")
   val jenkinsConfig = new JenkinsConfig(c getConfig "jenkinsConfig")
   val karotzConfig = new KarotzConfig(c getConfig "karotzConfig")
   val jobs = {

@@ -8,11 +8,15 @@ object ApplicationBuild extends Build {
     val appVersion      = "1.0-SNAPSHOT"
 
     val appDependencies = Seq(
-      "net.databinder.dispatch" %% "core" % "0.9.0",
       "net.liftweb" %% "lift-json" % "2.4",
-      "cc.spray" %  "spray-client" % "1.0-M2.2",
       "org.scalatest" %% "scalatest" % "1.8" % "test",
-      "com.typesafe.akka" % "akka-testkit" % "2.0.2"
+      "com.typesafe.akka" % "akka-testkit" % "2.0.2",
+      "org.parboiled" % "parboiled-scala" % "1.0.2",
+      "org.parboiled" % "parboiled-core" % "1.0.2",
+      "org.jvnet.mimepull" % "mimepull" % "1.8"
+
+
+//      "cc.spray" %  "spray-client" % "1.0-M3-SNAPSHOT"
 
   )
 

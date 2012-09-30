@@ -22,7 +22,10 @@ class NameGeneratingActor(karotzConfig: KarotzConfig) extends Actor {
   protected def receive = {
     case NamesStringRequest(namesSet) => {
       val names = namesSet.flatMap(nameMap.get(_)).toList
-      val namesString = generateNameString(new StringBuilder(), names);
+      val namesString = names match {
+        case list :: Nil => generateNameString(new StringBuilder(), names);
+        case Nil => "hmmmmmm. some mysterious person who i do not recognise.";
+      }
       sender ! NamesStringReply(namesString);
     }
   }

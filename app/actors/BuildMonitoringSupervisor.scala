@@ -2,31 +2,39 @@ package actors
 
 import akka.actor.{ActorRef, Props, Actor}
 import config.GlobalConfig
-import karotz.KarotzClientAdaptor
+import karotz.KarotzClient.{StartInteractiveMode}
+import karotz.{KarotzClient}
 import messaging.{MessageGeneratingActor, NameGeneratingActor}
-import akka.actor.FSM.SubscribeTransitionCallBack
-import akka.routing.Listen
 import actors.BuildStateActor.SubscribeToStateDataChanges
-import cc.spray.io.IoWorker
-import cc.spray.can.client.HttpClient
-import play.api.libs.concurrent.Akka
+import BuildMonitoringSupervisor._;
 
 
-class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: GlobalConfig) extends Actor {
+object BuildMonitoringSupervisor {
+  case object ShutdownRequest;
+  case object ShutdownComplete;
+}
+
+
+class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: GlobalConfig) extends Actor{
+
+  val funnel = context.actorOf(Props[PrioritisedMessageFunnel], "karotzMessageFunnel");
+
+  val ledStateActor = context.actorOf(Props(new LedStateActor(funnel)), "ledStateActor");
+
+  val karotzClient = context.actorOf(Props(new KarotzClient(funnel, ledStateActor, sprayCanHttpClientActor, config.karotzConfig)), "karotzClient")
+
+  karotzClient ! StartInteractiveMode
 
   override def preStart() {
-    val funnel = context.actorOf(Props[PrioritisedMessageFunnel], "karotzMessageFunnel");
-    val dispatchHttpClientActor = context.actorOf(Props(new HttpClientActor(config.httpConfig, config.jenkinsConfig)), "httpClientAdaptor");
 
     val sprayConduit = context.actorOf(
-      props = Props(new SprayHttpClientActor(sprayCanHttpClientActor, config.httpConfig, config.jenkinsConfig)),
+      props = Props(new SprayHttpClientActor(sprayCanHttpClientActor, config.jenkinsConfig)),
       name = "http-client"
     )
 
     val namingActor = context.actorOf(Props(new NameGeneratingActor(config.karotzConfig)), "namingGenerator")
 
     val messageGeneratingActor = context.actorOf(Props(new MessageGeneratingActor(namingActor, funnel)), "messageGeneratingActor");
-    val ledStateActor = context.actorOf(Props(new LedStateActor(funnel)), "ledStateActor");
 
     for (jobConfig <- config.jobs) {
 
@@ -37,14 +45,12 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
       buildStateActor ! SubscribeToStateDataChanges(messageGeneratingActor);
       buildStateActor ! SubscribeToStateDataChanges(ledStateActor);
 
-      context.actorOf(Props(new BuildStatusMonitoringActor(buildStateActor, dispatchHttpClientActor, config.jenkinsConfig, jobConfig)),
+      context.actorOf(Props(new BuildStatusMonitoringActor(buildStateActor, sprayConduit, config.jenkinsConfig, jobConfig)),
         "buildStatusMonitor_for_'"+akkaJobName+"'");
     }
-
-    val karotzClientAdaptor = context.actorOf(Props(new KarotzClientAdaptor(funnel, config.karotzConfig)), "karotzClientAdaptor");
-
-
   }
 
-  protected def receive = null
+  protected def receive = {
+    case ShutdownRequest => karotzClient forward ShutdownRequest
+  }
 }

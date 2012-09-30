@@ -1,49 +1,48 @@
 package actors
 
-import akka.actor.{ActorRef, ActorLogging, Actor}
+import akka.actor.{Props, ActorRef, ActorLogging, Actor}
 import net.liftweb.json.JsonAST.JValue
 import net.liftweb.json._
 import akka.event.LoggingReceive
-import config.{JenkinsConfig, HttpConfig}
-import akka.util.duration._
-import com.ning.http.client.RequestBuilder
-import cc.spray.client.{ConduitSettings, DispatchStrategies, Get, HttpConduit}
+import config.{JenkinsConfig}
+import cc.spray.client.{ConduitSettings, DispatchStrategies, HttpConduit}
 import cc.spray.http._
 import akka.dispatch.Future
-import cc.spray.http.HttpRequest
 import config.JenkinsConfig
-import config.HttpConfig
-import com.typesafe.config.ConfigFactory
 import actors.SprayHttpClientActor._
 import java.net.URI
-import actors.HttpClientActor.{JsonReply, JsonQuery, HttpClientActorMessage}
+import cc.spray.http.HttpResponse
+import actors.SprayHttpClientActor.DoJsonReply
+import akka.pattern.AskTimeoutException
+import akka.util.duration._
+import akka.util.{Deadline, Timeout}
 
 
 object SprayHttpClientActor {
+
+
+  abstract class HttpClientActorMessage
+  case class JsonQuery(query: String, username: String, password: String) extends HttpClientActorMessage
+  case class JsonReply(json: JValue) extends HttpClientActorMessage
 
   case class DoJsonReply(originalSender: ActorRef, response: HttpResponse) extends HttpClientActorMessage
 
 }
 
-class SprayHttpClientActor(httpClient: ActorRef, httpConfig: HttpConfig, jenkinsConfig: JenkinsConfig) extends Actor with ActorLogging {
+class SprayHttpClientActor(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) extends Actor with ActorLogging {
 
-  class MyConduit extends HttpConduit(httpClient, "dev-sandbox-dev00.development.playfish.com", 8080,
-    DispatchStrategies.NonPipelined())(context.system) {
-    val pipeline = simpleRequest ~> authenticate(BasicHttpCredentials(jenkinsConfig.userName, jenkinsConfig.password)) ~> sendReceive
-  }
 
-  var conduit: Option[MyConduit] = None;
+  val conduit = context.system.actorOf(
+    props = Props(new HttpConduit(httpClient, jenkinsConfig.url, jenkinsConfig.port)),
+    name = "jenkins-conduit"
+  )
 
-  def getConduit:MyConduit = {
-    conduit match {
-      case Some(conduit) => conduit
-      case None => {
-        val newConduit = new MyConduit
-        conduit = Some(newConduit)
-        newConduit
-      }
-    }
-  }
+  implicit val timeout = Timeout(30 seconds);
+
+
+  import HttpConduit._
+  val pipeline = addCredentials(BasicHttpCredentials(jenkinsConfig.userName, jenkinsConfig.password)) ~> sendReceive(conduit)
+
 
   override def preStart() = {
     log.debug("Starting HTTP Client");
@@ -74,20 +73,32 @@ class SprayHttpClientActor(httpClient: ActorRef, httpConfig: HttpConfig, jenkins
 
       log.info("Query is ["+finalUrl+"]")
 
-      val responseF: Future[HttpResponse] = getConduit.pipeline(Get(finalUrl))
+      val responseF: Future[HttpResponse] = pipeline(Get(finalUrl))
 
 
       val originalSender = sender
-      for (response <- responseF) yield self ! DoJsonReply(originalSender, response)
+
+      responseF.onSuccess {
+        case response => {
+          log.info("Reply for query [{}] received", finalUrl);
+          self ! DoJsonReply(originalSender, response)
+        };
+      }
+      responseF.onFailure {
+        case e:AskTimeoutException => {
+          log.error("Jenkins Query [{}] timed out after [{}]", finalUrl, timeout)
+        }
+        case e:Exception => {
+          log.error("Unknown Exception thrown by query [{}]", finalUrl)
+          e.printStackTrace();
+          self ! JsonQuery(urlString, username, password)
+        };
+      }
     }
     case DoJsonReply(originalSender, response) => {
-      response.content map {
-        content => {
-          val json = new String(content.buffer)
+          val json = new String(response.entity.asString)
 
           originalSender ! JsonReply(parse(json));
-        }
-      }
     }
   }
 }

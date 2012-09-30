@@ -2,7 +2,8 @@ import actors._
 import akka.actor.{ActorRef, Actor, ActorSystem}
 import akka.dispatch.Await
 import akka.testkit.{ImplicitSender, TestKit, TestActorRef}
-import akka.util.Timeout
+import akka.util.{Deadline, Duration, Timeout}
+import karotz.KarotzClient.GreenLed
 import org.scalatest.{BeforeAndAfterAll, WordSpec}
 import org.scalatest.matchers.MustMatchers
 import akka.util.duration._
@@ -45,9 +46,12 @@ with WordSpec with MustMatchers with ImplicitSender with BeforeAndAfterAll {
     "sent one low priority message" must {
       "reply with that message when queried" in {
 
+
+        val d: Deadline = 5.seconds.fromNow
+
         val actorRef = fixture.actorRef;
         actorRef.receive(LowPriorityMessage(A_COMMAND))
-        val result = Await.result((actorRef ? ReplyWithNextKarotzCommand), 5 seconds).asInstanceOf[FunnelMessage]
+        val result = Await.result((actorRef ? ReplyWithNextKarotzCommand(None)), 5 seconds).asInstanceOf[FunnelMessage]
         result must be(A_COMMAND)
 
       }
@@ -62,9 +66,9 @@ with WordSpec with MustMatchers with ImplicitSender with BeforeAndAfterAll {
 
         forwarder1 ! (mediator, LowPriorityMessage(A_COMMAND));
         forwarder2 ! (mediator, LowPriorityMessage(ANOTHER_COMMAND));
-        mediator ! ReplyWithNextKarotzCommand;
+        mediator ! ReplyWithNextKarotzCommand(None);
         expectMsg(A_COMMAND)
-        mediator ! ReplyWithNextKarotzCommand;
+        mediator ! ReplyWithNextKarotzCommand(None);
         expectMsg(ANOTHER_COMMAND)
 
       }
@@ -80,9 +84,9 @@ with WordSpec with MustMatchers with ImplicitSender with BeforeAndAfterAll {
         forwarder1 ! (mediator, LowPriorityMessage(A_COMMAND));
         forwarder2 ! (mediator, LowPriorityMessage(ANOTHER_COMMAND));
         forwarder1 ! (mediator, LowPriorityMessage(A_THIRD_COMMAND));
-        mediator ! ReplyWithNextKarotzCommand;
+        mediator ! ReplyWithNextKarotzCommand(None);
         expectMsg(A_THIRD_COMMAND)
-        mediator ! ReplyWithNextKarotzCommand;
+        mediator ! ReplyWithNextKarotzCommand(None);
         expectMsg(ANOTHER_COMMAND)
 
       }
@@ -98,9 +102,9 @@ with WordSpec with MustMatchers with ImplicitSender with BeforeAndAfterAll {
 
         forwarder1 ! (mediator, LowPriorityMessage(A_COMMAND));
         forwarder2 ! (mediator, HighPriorityMessage(ANOTHER_COMMAND));
-        mediator ! ReplyWithNextKarotzCommand;
+        mediator ! ReplyWithNextKarotzCommand(None);
         expectMsg(ANOTHER_COMMAND)
-        mediator ! ReplyWithNextKarotzCommand;
+        mediator ! ReplyWithNextKarotzCommand(None);
         expectMsg(A_COMMAND)
 
       }

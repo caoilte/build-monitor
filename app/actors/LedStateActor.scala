@@ -1,52 +1,72 @@
 package actors
 
-import akka.actor.{ActorRef, ActorLogging, Actor}
-import akka.util.Timeout
+import akka.actor.{FSM, ActorRef, ActorLogging, Actor}
+import akka.util.{Deadline, Timeout}
 import akka.util.duration._
-import actors.BuildStateActor._
 import collection.immutable.HashMap
-import karotz.KarotzClientAdaptor._
-import actors.BuildStateActor.BuildStateData
-import karotz.KarotzClientAdaptor.LightFadeActionMessage
+import actors.BuildStateActor._
+import karotz.KarotzClient._
 import actors.PrioritisedMessageFunnel.{LowPriorityMessage, HighPriorityMessage}
+import LedStateActor._
+import actors.PrioritisedMessageFunnel.HighPriorityMessage
+import actors.PrioritisedMessageFunnel.LowPriorityMessage
+import actors.PrioritisedMessageFunnel.HighPriorityMessage
+import actors.PrioritisedMessageFunnel.LowPriorityMessage
+import akka.event.LoggingReceive
+;
+
+
+object LedStateActor {
+  case object LedStateRequest;
+
+
+}
 
 
 class LedStateActor(funnel: ActorRef) extends Actor with ActorLogging {
+  var brokenBuildsMap = new HashMap[String, Boolean];
 
-  implicit val timeout = Timeout(5 seconds)
 
-  var brokenBuildsMap: HashMap[String, Boolean] = new HashMap[String, Boolean]();
+  def receive = LoggingReceive {
+    case BuildStateNotification(state, BuildStateData(jobName, buildsSinceLastFailure, breakageAuthors, sinceBreakageAuthors)) => {
+      brokenBuildsMap = brokenBuildsMap + ((jobName, !state.isWorking));
 
-  def sendLedMessage(stateHasChanged: Boolean, colour: LedColour, fadeoutPeriod: Long) {
-    if (stateHasChanged) {
-      funnel forward HighPriorityMessage(LightActionMessage(colour))
-    } else {
-      funnel forward LowPriorityMessage(LightFadeActionMessage(colour, fadeoutPeriod))
+      sendLedMessage(state);
+    }
+    case LedStateRequest => sender ! KarotzMessage(LightAction(Some(ledColour)))
+  }
+
+  def sendLedMessage(state: BuildStateActor.State) {
+
+    // pulse is the colour that it will end up in.
+
+    state match {
+      case Healthy => {
+
+        funnel forward LowPriorityMessage(KarotzMessage(LightPulseAction(Some(GreenLed), 1000, 15000)))
+      }
+      case JustFixed => {
+        funnel forward HighPriorityMessage(KarotzMessage(LightPulseAction(Some(GreenLed), 1000, 30000)))
+      }
+      case JustBroken => {
+        funnel forward HighPriorityMessage(KarotzMessage(LightPulseAction(Some(RedLed), 1000, 30000)))
+      }
+      case StillBroken => {
+
+        funnel forward HighPriorityMessage(KarotzMessage(LightPulseAction(Some(RedLed), 1000, 30000)))
+      }
     }
   }
+
 
   def areBuildsBroken = brokenBuildsMap.exists(_._2);
 
+  def ledColour: LedColour = {
+    val areBuildsBroken = brokenBuildsMap.exists(_._2);
 
-  protected def receive = {
-
-    case (state, BuildStateData(jobName, buildsSinceLastFailure, breakageAuthors, sinceBreakageAuthors)) => {
-      val wereBuildsBroken = areBuildsBroken;
-      val oldBrokenBuildsMapSize = brokenBuildsMap.size
-      brokenBuildsMap = brokenBuildsMap + ((jobName, false));
-
-      val stateHasChanged = (oldBrokenBuildsMapSize == 0) || areBuildsBroken != wereBuildsBroken
-
-      state match {
-        case Healthy => sendLedMessage(stateHasChanged, GreenLed, 1)
-        case JustFixed => sendLedMessage(stateHasChanged, GreenLed, 4)
-        case JustBroken => sendLedMessage(stateHasChanged, RedLed, 4)
-        case StillBroken => sendLedMessage(stateHasChanged, RedLed, 2)
-      }
-    }
-
-
-
+    if (areBuildsBroken) RedLed else GreenLed
   }
+
+
 
 }
