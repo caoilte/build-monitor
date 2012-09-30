@@ -60,15 +60,31 @@ Running
 
 There is no web facing code, but the app won't start until a page is hit for the first time.
 
-
 TODO
 ----
 
+* Figure out how to decouple Karotz API state from individual build bunny state.
+** This will allow multiple bunnies over the same wire without overloading the API
+* Add prover Actor supervision mechanisms. Ssome particularly egregious handling of failure paths right now including,
+** Actor initialisation in prestart hooks
+** infinite error recovery attempts (with amusing self-DOS results when network cable unplugged)
 * Turn into a Play Module
 * Add more tests
+* Build states that are more than X minutes old should not be published
+** Allows system to be restarted without re-announcing old but more recent results.
+* Timer API (to announce Standles)
+* Webpage for adhoc announcings
+
+
+DONE
+----
+
 * Figure out why Spray Can Client doesn't play nice (see: [Google Groups Post][sprayCanProblems].
 * Refactor out dependency on [MRitchie's Karotz lib][mRitchieKarotzApi] and make properly async.
-* Add common error paths (some particularly egregious handling of failed Actors right now)
+* Decent LED handling
+** temporary Pulses on builds
+** Always return to Green if all builds working, red otherwise
+
 
 LICENSE
 =======
