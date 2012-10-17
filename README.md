@@ -2,7 +2,7 @@ Build Monitor
 =============
 
 This project hooks up a Jenkins CI to a Karotz Build Bunny. Karotz Bunnies expose various APIs for their control, but
-thems very easy to drown so this project uses Akka to limit and prioritise.
+thems very easy to drown so this project uses Akka to limit and prioritise.     lte
 
 The Monitor relies on the Build Bunny being on the same network as the build monitor because unlike all other Karotz
 build bunny build monitors it uses the local wire API instead of the web facing REST API. It does this because the web
@@ -37,9 +37,8 @@ Use the following template,
             "password" : "<PASSWORD>"
         },
         "karotzConfig" : {
-            "apiKey" : "<KAROTZ_API_KEY>",
-            "secretKey" : "<KAROTZ_SECRET_KEY>",
-            "installId" : "<KAROTZ_INSTALL_ID>",
+            "ipAddress" : "192.168.1.8",
+            "port" : 9123,
             "people" : [
                 {
                     "userName" : "caoilte.oconnor",
