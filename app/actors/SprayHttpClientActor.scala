@@ -16,6 +16,7 @@ import actors.SprayHttpClientActor.DoJsonReply
 import akka.pattern.AskTimeoutException
 import akka.util.duration._
 import akka.util.{Deadline, Timeout}
+import akka.actor.FSM.Failure
 
 
 object SprayHttpClientActor {
@@ -71,7 +72,7 @@ class SprayHttpClientActor(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) e
     case JsonQuery(urlString, username, password) => {
       val finalUrl = getPathFromUrl(urlString)
 
-      log.info("Query is ["+finalUrl+"]")
+      log.debug("Query is ["+finalUrl+"]")
 
       val responseF: Future[HttpResponse] = pipeline(Get(finalUrl))
 
@@ -80,25 +81,27 @@ class SprayHttpClientActor(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) e
 
       responseF.onSuccess {
         case response => {
-          log.info("Reply for query [{}] received", finalUrl);
+          log.debug("Reply for query [{}] received", finalUrl);
           self ! DoJsonReply(originalSender, response)
         };
       }
       responseF.onFailure {
         case e:AskTimeoutException => {
           log.error("Jenkins Query [{}] timed out after [{}]", finalUrl, timeout)
+          originalSender ! Failure(e)
         }
         case e:Exception => {
-          log.error("Unknown Exception thrown by query [{}]", finalUrl)
-          e.printStackTrace();
-          self ! JsonQuery(urlString, username, password)
+          //log.error(e, "Unknown Exception thrown by query [{}]", finalUrl)
+          //e.printStackTrace();
+          originalSender ! Failure(e)
+          //self ! JsonQuery(urlString, username, password)
         };
       }
     }
     case DoJsonReply(originalSender, response) => {
-          val json = new String(response.entity.asString)
+      val json = new String(response.entity.asString)
 
-          originalSender ! JsonReply(parse(json));
+      originalSender ! JsonReply(parse(json));
     }
   }
 }

@@ -4,8 +4,7 @@ import akka.actor.{ActorLogging, FSM, Actor, ActorRef}
 import collection.mutable
 import com.sun.tools.javac.comp.Todo
 import akka.event.LoggingReceive
-import karotz.KarotzClient._
-import karotz.KarotzClient.KarotzMessage
+import karotz.Karotz.{LightAction, LightPulseAction, KarotzMessage, LedColour}
 import scala.Some
 
 

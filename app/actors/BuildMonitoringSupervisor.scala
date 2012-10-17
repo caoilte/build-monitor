@@ -2,11 +2,13 @@ package actors
 
 import akka.actor.{ActorRef, Props, Actor}
 import config.GlobalConfig
-import karotz.KarotzClient.{StartInteractiveMode}
-import karotz.{KarotzClient}
+import karotz.Karotz.StartInteractiveMode
+import karotz.LocalClient
 import messaging.{MessageGeneratingActor, NameGeneratingActor}
 import actors.BuildStateActor.SubscribeToStateDataChanges
-import BuildMonitoringSupervisor._;
+import BuildMonitoringSupervisor._
+import net.violet.karotz.client.KarotzIOHandler
+;
 
 
 object BuildMonitoringSupervisor {
@@ -21,7 +23,8 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
 
   val ledStateActor = context.actorOf(Props(new LedStateActor(funnel)), "ledStateActor");
 
-  val karotzClient = context.actorOf(Props(new KarotzClient(funnel, ledStateActor, sprayCanHttpClientActor, config.karotzConfig)), "karotzClient")
+  //val karotzClient = context.actorOf(Props(new KarotzClient(funnel, ledStateActor, sprayCanHttpClientActor, config.karotzConfig)), "karotzClient")
+  val karotzClient = context.actorOf(Props(new LocalClient(new KarotzIOHandler, config.karotzConfig, funnel, ledStateActor)), "localClient")
 
   karotzClient ! StartInteractiveMode
 
@@ -40,13 +43,15 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
 
       val akkaJobName = jobConfig.name.replace(' ', '_');
 
-      val buildStateActor = context.actorOf(Props[BuildStateActor],
+
+      val buildStatusMonitoringActor = context.actorOf(Props(new BuildStatusMonitoringActor(sprayConduit, config.jenkinsConfig, jobConfig)),
+        "buildStatusMonitor_for_'"+akkaJobName+"'");
+
+      val buildStateActor = context.actorOf(Props(new BuildStateActor(buildStatusMonitoringActor)),
         "buildState_for_'"+akkaJobName+"'");
       buildStateActor ! SubscribeToStateDataChanges(messageGeneratingActor);
       buildStateActor ! SubscribeToStateDataChanges(ledStateActor);
 
-      context.actorOf(Props(new BuildStatusMonitoringActor(buildStateActor, sprayConduit, config.jenkinsConfig, jobConfig)),
-        "buildStatusMonitor_for_'"+akkaJobName+"'");
     }
   }
 

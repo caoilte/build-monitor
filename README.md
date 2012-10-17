@@ -5,8 +5,15 @@ This project hooks up a Jenkins CI to a Karotz Build Bunny. Karotz Bunnies expos
 very easy to overwhelm and so this project uses Akka to limit and prioritise messages to it and to schedule regular
 Karotz API token token refresh calls.
 
-It is currently built on Play 2.0 because that was quick to setup and may allow the project to be used as a
-dashboard at a later date.
+The Monitor relies on the Build Bunny being on the same network as the build monitor because unlike all other Karotz
+build bunny build monitors it uses the local wire API instead of the web facing REST API. It does this because the web
+facing REST API is patchy like a one eyed pirate. Connecting directly to the device is much more reliable. The downside
+is that depending on your wifi network, you may need to buy an butt adaptor that can link your bunny into your wired
+network.
+
+
+The Build Monitor project is currently built on Play 2.0 because that was quick to setup, deploy and may allow the
+project to be used as a dashboard at a later date.
 
 Setup
 -----
@@ -63,9 +70,9 @@ There is no web facing code, but the app won't start until a page is hit for the
 TODO
 ----
 
-* Figure out how to decouple Karotz API state from individual build bunny state.
+* Decouple Karotz API state from individual build bunny state.
 ** This will allow multiple bunnies over the same wire without overloading the API
-* Add prover Actor supervision mechanisms. Ssome particularly egregious handling of failure paths right now including,
+* Add prover Actor supervision mechanisms. Some particularly egregious handling of failure paths right now including,
 ** Actor initialisation in prestart hooks
 ** infinite error recovery attempts (with amusing self-DOS results when network cable unplugged)
 * Turn into a Play Module
@@ -74,6 +81,9 @@ TODO
 ** Allows system to be restarted without re-announcing old but more recent results.
 * Timer API (to announce Standles)
 * Webpage for adhoc announcings
+* Currently depends on precompiled Karotz VM jar. Remove this by,
+** migrating Apache Mina NIO code to custom Akka TCP client
+** compiling proto file myself
 
 
 DONE

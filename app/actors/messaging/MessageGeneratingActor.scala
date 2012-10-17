@@ -13,7 +13,7 @@ import actors.BuildStateActor.BuildStateData
 import actors.messaging.NameGeneratingActor.NamesStringReply
 import actors.PrioritisedMessageFunnel.HighPriorityMessage
 import actors.PrioritisedMessageFunnel.LowPriorityMessage
-import actors.karotz.KarotzClient.{KarotzMessage, SpeechAction}
+import actors.karotz.Karotz._
 
 object MessageGeneratingActor {
   case class FormatMessage(formatMessage: String, args: String*)
@@ -24,33 +24,36 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
   implicit val timeout = Timeout(5 seconds)
 
   protected def receive = {
-    case BuildStateNotification(JustFixed, BuildStateData(jobName, buildsSinceLastStateChange, fixAuthors, sinceFixAuthors)) => {
-      namingActor ? NamesStringRequest(fixAuthors) map {
+    case BuildStateNotification(JustFixed, BuildStateData(buildInformation, committers)) => {
+      namingActor ? NamesStringRequest(committers.lastBuild) map {
         case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+jobName+" build has been fixed by "+authors)))
+          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+buildInformation.jobName+" build has been fixed by "+authors)))
         }
       }
     }
 
-    case BuildStateNotification(JustBroken, BuildStateData(jobName, buildsSinceLastStateChange, breakageAuthors, sinceBreakageAuthors)) => {
-      namingActor ? NamesStringRequest(breakageAuthors) map {
+    case BuildStateNotification(JustBroken, BuildStateData(buildInformation, committers)) => {
+      namingActor ? NamesStringRequest(committers.whoBrokeBuild) map {
         case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+jobName+" build has been broken by "+authors)))
+          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+buildInformation.jobName+" build has been broken by "+authors)))
         }
       }
     }
 
 
-    case BuildStateNotification(StillBroken, BuildStateData(jobName, buildsSinceLastStateChange, breakageAuthors, sinceBreakageAuthors)) => {
-      val breakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(breakageAuthors))
-      val sinceBreakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(sinceBreakageAuthors))
+    case BuildStateNotification(StillBroken, BuildStateData(buildInformation, committers)) => {
+      val breakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(committers.whoBrokeBuild))
+      val sinceBreakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(committers.sincePreviousGoodBuild))
+
+
+      val buildsSinceLastStateChange = buildInformation.lastBuildNumber - buildInformation.lastSuccessfulBuildNumber
 
 
       for {
         NamesStringReply(breakageAuthorsString) <- breakageAuthorsStringFuture.mapTo[NamesStringReply]
         NamesStringReply(sinceBreakageAuthorsString) <- sinceBreakageAuthorsStringFuture.mapTo[NamesStringReply]
       } yield funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
-        "Attention. The "+jobName+" build was broken by " + breakageAuthorsString + " and has failed "+ buildsSinceLastStateChange + " times since with " +
+        "Attention. The "+buildInformation.jobName+" build was broken by " + breakageAuthorsString + " and has failed "+ buildsSinceLastStateChange + " times since with " +
           "checkins from " + sinceBreakageAuthorsString)))
     }
   }

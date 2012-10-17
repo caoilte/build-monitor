@@ -5,7 +5,7 @@ import akka.util.{Deadline, Timeout}
 import akka.util.duration._
 import collection.immutable.HashMap
 import actors.BuildStateActor._
-import karotz.KarotzClient._
+import karotz.Karotz._
 import actors.PrioritisedMessageFunnel.{LowPriorityMessage, HighPriorityMessage}
 import LedStateActor._
 import actors.PrioritisedMessageFunnel.HighPriorityMessage
@@ -28,8 +28,8 @@ class LedStateActor(funnel: ActorRef) extends Actor with ActorLogging {
 
 
   def receive = LoggingReceive {
-    case BuildStateNotification(state, BuildStateData(jobName, buildsSinceLastFailure, breakageAuthors, sinceBreakageAuthors)) => {
-      brokenBuildsMap = brokenBuildsMap + ((jobName, !state.isWorking));
+    case BuildStateNotification(state, BuildStateData(buildInformation, committers)) => {
+      brokenBuildsMap = brokenBuildsMap + ((buildInformation.jobName, !state.isWorking));
 
       sendLedMessage(state);
     }

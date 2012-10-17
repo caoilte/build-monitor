@@ -1,0 +1,16 @@
+
+Each message is sent over the network preceded by 4 bytes which is the length of the message, Karotz will reply with the same format.
+
+Will need to compile this proto buffer def
+http://wiki.karotz.com/index.php/Voos-message.proto
+
+some details on VM we've stolen
+http://dev.karotz.com/sdk/en/virtual_machine.htm
+
+Example subversion of VM class files
+http://wiki.karotz.com/index.php/TCP
+
+
+Discussion of using Akka to do TCP
+http://www.salanki.st/index.php/2011/04/
+http://www.salanki.st/index.php/2011/04/simple-nio-with-akka-and-hawtdispatch/

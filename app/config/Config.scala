@@ -24,9 +24,9 @@ class KarotzConfig(c: Config) {
     val peopleList = c getConfigList("people")
     peopleList.map(new PeopleConfig(_))(breakOut) : List[PeopleConfig]
   }
-  val apiKey = c getString "apiKey"
-  val secretKey = c getString "secretKey"
-  val installId = c getString "installId"
+
+  val ipAddress = c getString "ipAddress"
+  val port = c getInt "port"
 }
 
 class JobConfig(c: Config) {
