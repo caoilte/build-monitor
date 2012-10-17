@@ -1,9 +1,8 @@
 Build Monitor
 =============
 
-This project hooks up a Jenkins CI to a Karotz Build Bunny. Karotz Bunnies expose a webservice for control, but it is
-very easy to overwhelm and so this project uses Akka to limit and prioritise messages to it and to schedule regular
-Karotz API token token refresh calls.
+This project hooks up a Jenkins CI to a Karotz Build Bunny. Karotz Bunnies expose various APIs for their control, but
+thems very easy to drown so this project uses Akka to limit and prioritise.
 
 The Monitor relies on the Build Bunny being on the same network as the build monitor because unlike all other Karotz
 build bunny build monitors it uses the local wire API instead of the web facing REST API. It does this because the web

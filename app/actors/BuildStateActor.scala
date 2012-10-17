@@ -62,17 +62,12 @@ object BuildStateActor {
     override def addBuildInformation(buildInformation: BuildInformation): Data = new BuildStateData(buildInformation)
   }
   case class BuildStateData(buildInformation: BuildInformation, committers: Committers) extends Data {
-//    def this(jobName: String, breakageAuthors: Set[String]) {
-//      this(jobName, 1, breakageAuthors, new HashSet[String]());
-//    }
       def this(buildInformation: BuildInformation) {
         this(buildInformation, new Committers());
       }
 
     def addBuildInformation(buildInformation: BuildInformation) = new BuildStateData(buildInformation, committers);
   }
-
-  // 5
 }
 
 class BuildStateActor(buildStateActor: ActorRef) extends Actor with FSM[State, Data] {

@@ -23,7 +23,6 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
 
   val ledStateActor = context.actorOf(Props(new LedStateActor(funnel)), "ledStateActor");
 
-  //val karotzClient = context.actorOf(Props(new KarotzClient(funnel, ledStateActor, sprayCanHttpClientActor, config.karotzConfig)), "karotzClient")
   val karotzClient = context.actorOf(Props(new LocalClient(new KarotzIOHandler, config.karotzConfig, funnel, ledStateActor)), "localClient")
 
   karotzClient ! StartInteractiveMode
