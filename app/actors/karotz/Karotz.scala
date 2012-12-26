@@ -7,23 +7,23 @@ import collection.immutable
 object Karotz {
 
 
-  sealed trait State
-  case object KarotzShutdownCompleted extends State
-  case object Uninitialised extends State
-  case object WaitingForInteractiveModeToStart extends State
-  case object WaitingForInteractiveModeToStop extends State
-  case object InInteractiveModeAndWaitingForFunnelPoll extends State
-  case object InInteractiveModeAndWaitingForFunnelReply extends State
-  case object InInteractiveModeAndWaitingForKarotzReply extends State
+//  sealed trait State
+//  case object KarotzShutdownCompleted extends State
+//  case object Uninitialised extends State
+//  case object WaitingForInteractiveModeToStart extends State
+//  case object WaitingForInteractiveModeToStop extends State
+//  case object InInteractiveModeAndWaitingForFunnelPoll extends State
+//  case object InInteractiveModeAndWaitingForFunnelReply extends State
+//  case object InInteractiveModeAndWaitingForKarotzReply extends State
 
-  sealed trait KarotzClientMessage
-  case object StartInteractiveMode extends KarotzClientMessage
-  case class InteractiveModeStarted(interactiveId: String) extends KarotzClientMessage
-  case object InteractiveModeFailedToStart extends KarotzClientMessage
-  case object StopInteractiveMode extends KarotzClientMessage
-  case object InteractiveModeStopped extends KarotzClientMessage
-  case object PollForMessages extends KarotzClientMessage
-  case object KarotzMessageProcessed extends KarotzClientMessage
+//  sealed trait KarotzClientMessage
+//  case object StartInteractiveMode extends KarotzClientMessage
+//  case class InteractiveModeStarted(interactiveId: String) extends KarotzClientMessage
+//  case object InteractiveModeFailedToStart extends KarotzClientMessage
+//  case object StopInteractiveMode extends KarotzClientMessage
+//  case object InteractiveModeStopped extends KarotzClientMessage
+//  case object PollForMessages extends KarotzClientMessage
+//  case object KarotzMessageProcessed extends KarotzClientMessage
 
   sealed abstract class LedColour {
     def colour: String
@@ -43,7 +43,10 @@ object Karotz {
 
   case class KarotzMessage(action: KarotzAction) extends FunnelMessage;
 
-  abstract class KarotzAction {
+
+  trait KarotzAction
+  case object PingAction extends KarotzAction
+  abstract class ParameterisedKarotzAction extends KarotzAction {
     def getParams: immutable.HashMap[String, String];
     def getAPISuffix: String;
   }

@@ -10,7 +10,7 @@ import akka.util.Timeout
 import akka.dispatch.Await
 import akka.util.duration._;
 import akka.pattern.ask
-import BuildMonitoringSupervisor._;
+import actors.BuildMonitoringSupervisor.ShutdownRequest
 
 class BuildMonitor {
 

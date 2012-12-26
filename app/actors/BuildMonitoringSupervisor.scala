@@ -2,13 +2,11 @@ package actors
 
 import akka.actor.{ActorRef, Props, Actor}
 import config.GlobalConfig
-import karotz.Karotz.StartInteractiveMode
-import karotz.LocalClient
+import karotz.KarotzClientManager.PerformAction
+import karotz.{KarotzClientManager, KarotzThroughputManager}
 import messaging.{MessageGeneratingActor, NameGeneratingActor}
 import actors.BuildStateActor.SubscribeToStateDataChanges
-import BuildMonitoringSupervisor._
-import net.violet.karotz.client.KarotzIOHandler
-;
+import actors.BuildMonitoringSupervisor.ShutdownRequest
 
 
 object BuildMonitoringSupervisor {
@@ -23,9 +21,10 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
 
   val ledStateActor = context.actorOf(Props(new LedStateActor(funnel)), "ledStateActor");
 
-  val karotzClient = context.actorOf(Props(new LocalClient(new KarotzIOHandler, config.karotzConfig, funnel, ledStateActor)), "localClient")
+  val karotzClientManagerProps = Props(new KarotzClientManager(config.karotzConfig))
 
-  karotzClient ! StartInteractiveMode
+  val karotzThroughputManager = context.actorOf(Props(
+    new KarotzThroughputManager(karotzClientManagerProps, funnel, ledStateActor)), "karotz-throughput-manager")
 
   override def preStart() {
 
@@ -55,6 +54,6 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
   }
 
   protected def receive = {
-    case ShutdownRequest => karotzClient forward ShutdownRequest
+    case ShutdownRequest => karotzThroughputManager forward ShutdownRequest
   }
 }

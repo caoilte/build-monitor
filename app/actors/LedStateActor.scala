@@ -42,7 +42,6 @@ class LedStateActor(funnel: ActorRef) extends Actor with ActorLogging {
 
     state match {
       case Healthy => {
-
         funnel forward LowPriorityMessage(KarotzMessage(LightPulseAction(Some(GreenLed), 1000, 15000)))
       }
       case JustFixed => {
@@ -52,8 +51,10 @@ class LedStateActor(funnel: ActorRef) extends Actor with ActorLogging {
         funnel forward HighPriorityMessage(KarotzMessage(LightPulseAction(Some(RedLed), 1000, 30000)))
       }
       case StillBroken => {
-
         funnel forward HighPriorityMessage(KarotzMessage(LightPulseAction(Some(RedLed), 1000, 30000)))
+      }
+      case Unknown => {
+        log.warning("LED State Requested when situation is unknown")
       }
     }
   }

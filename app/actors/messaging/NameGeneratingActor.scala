@@ -1,6 +1,6 @@
 package actors.messaging
 
-import akka.actor.Actor
+import akka.actor.{ActorLogging, Actor}
 import config.KarotzConfig
 import collection.mutable.HashMap
 import actors.messaging.NameGeneratingActor.{NamesStringReply, NamesStringRequest}
@@ -12,7 +12,7 @@ object NameGeneratingActor {
   case class NamesStringReply(namesString: String)
 }
 
-class NameGeneratingActor(karotzConfig: KarotzConfig) extends Actor {
+class NameGeneratingActor(karotzConfig: KarotzConfig) extends Actor with ActorLogging {
 
   val nameMap = karotzConfig.people.foldLeft(new HashMap[String, String]) { (map, person) =>
     map.+=((person.userName, person.karotzName));
@@ -24,7 +24,9 @@ class NameGeneratingActor(karotzConfig: KarotzConfig) extends Actor {
       val names = namesSet.flatMap(nameMap.get(_)).toList
       val namesString = names match {
         case list :: tail => generateNameString(new StringBuilder(), names);
-        case Nil => "hmmmmmm. some mysterious person who i do not recognise.";
+        case Nil => {
+          "hmmmmmm. some mysterious person who i do not recognise."
+        };
       }
       sender ! NamesStringReply(namesString);
     }
