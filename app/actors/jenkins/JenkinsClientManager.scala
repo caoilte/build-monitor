@@ -143,36 +143,36 @@ class JenkinsClientManager(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) e
     }
   }
 
-  def getURI(path: String): URI = { new URI(
-    "http",
-    null,
-    jenkinsConfig.url,
-    jenkinsConfig.port,
-    path,
-    null,
-    null);
-  }
-  val baseUrl = getURI("")
-  private def getPathFromUrl(urlString: String):String = {
-    "/" + baseUrl.relativize(new URI(urlString))
-  }
+//  def getURI(path: String): URI = { new URI(
+//    "http",
+//    null,
+//    jenkinsConfig.url,
+//    jenkinsConfig.port,
+//    path,
+//    null,
+//    null);
+//  }
+//  val baseUrl = getURI("")
+//  private def getPathFromUrl(urlString: String):String = {
+//    "/" + baseUrl.relativize(new URI(urlString))
+//  }
 
   private def doQuery(originalSender: ActorRef, query: String) {
-    val finalUrl = getPathFromUrl(query)
+    //val finalUrl = getPathFromUrl(query)
 
-    log.debug("Query is ["+finalUrl+"]")
+    log.debug("Query is ["+query+"]")
 
-    val responseF: Future[HttpResponse] = pipeline(Get(finalUrl))
+    val responseF: Future[HttpResponse] = pipeline(Get(query))
 
     responseF.onSuccess {
       case response => {
-        log.debug("Reply for query [{}] received", finalUrl);
+        log.debug("Reply for query [{}] received", query);
         self ! DoJsonReply(originalSender, response)
       };
     }
     responseF.onFailure {
       case e:AskTimeoutException => {
-        log.error("Jenkins Query [{}] timed out after [{}]", finalUrl, timeout)
+        log.error("Jenkins Query [{}] timed out after [{}]", query, timeout)
         self ! JsonQueryFailed(originalSender, query)
       }
       case e:Exception => {

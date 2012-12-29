@@ -70,14 +70,14 @@ object BuildStateActor {
   }
 }
 
-class BuildStateActor(buildStateActor: ActorRef) extends Actor with FSM[State, Data] {
+class BuildStateActor extends Actor with FSM[State, Data] {
 
   var listeningActors = new HashSet[ActorRef]();
 
-  override def preStart() {
-    // registering with other actors
-    buildStateActor ! RegisterStatusMonitoring(self)
-  }
+//  override def preStart() {
+//    // registering with other actors
+//    buildStateActor ! RegisterStatusMonitoring(self)
+//  }
 
   startWith(Unknown, NoBuildStateData)
 

@@ -2,7 +2,8 @@ package actors
 
 import akka.actor.{ActorRef, Props, Actor}
 import config.GlobalConfig
-import jenkins.JenkinsClientManager
+import jenkins.JenkinsMonitoring.RegisterMonitoringListener
+import jenkins.{LatestBuildMonitor, BuildInformationMonitor, JenkinsMonitoring, JenkinsClientManager}
 import karotz.KarotzClientManager.PerformAction
 import karotz.{KarotzClientManager, KarotzThroughputManager}
 import messaging.{MessageGeneratingActor, NameGeneratingActor}
@@ -43,11 +44,15 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
       val akkaJobName = jobConfig.name.replace(' ', '_');
 
 
-      val buildStatusMonitoringActor = context.actorOf(Props(new BuildStatusMonitoringActor(jenkinsClientManager, config.jenkinsConfig, jobConfig)),
-        "buildStatusMonitor_for_'"+akkaJobName+"'");
+      val buildInformationMonitor = context.actorOf(Props(new JenkinsMonitoring(jenkinsClientManager, new BuildInformationMonitor(jobConfig))),
+        "buildInformationMonitor_for_'"+akkaJobName+"'");
+      val latestBuildMonitor = context.actorOf(Props(new JenkinsMonitoring(jenkinsClientManager, new LatestBuildMonitor(jobConfig))),
+        "latestBuildMonitor_for_'"+akkaJobName+"'");
 
-      val buildStateActor = context.actorOf(Props(new BuildStateActor(buildStatusMonitoringActor)),
+      val buildStateActor = context.actorOf(Props(new BuildStateActor()),
         "buildState_for_'"+akkaJobName+"'");
+      buildInformationMonitor ! RegisterMonitoringListener(buildStateActor)
+      latestBuildMonitor ! RegisterMonitoringListener(buildStateActor)
       buildStateActor ! SubscribeToStateDataChanges(messageGeneratingActor);
       buildStateActor ! SubscribeToStateDataChanges(ledStateActor);
 
