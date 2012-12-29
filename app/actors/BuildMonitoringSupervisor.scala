@@ -2,6 +2,7 @@ package actors
 
 import akka.actor.{ActorRef, Props, Actor}
 import config.GlobalConfig
+import jenkins.JenkinsClientManager
 import karotz.KarotzClientManager.PerformAction
 import karotz.{KarotzClientManager, KarotzThroughputManager}
 import messaging.{MessageGeneratingActor, NameGeneratingActor}
@@ -10,8 +11,7 @@ import actors.BuildMonitoringSupervisor.ShutdownRequest
 
 
 object BuildMonitoringSupervisor {
-  case object ShutdownRequest;
-  case object ShutdownComplete;
+  case object ShutdownRequest
 }
 
 
@@ -26,12 +26,13 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
   val karotzThroughputManager = context.actorOf(Props(
     new KarotzThroughputManager(karotzClientManagerProps, funnel, ledStateActor)), "karotz-throughput-manager")
 
+  val jenkinsClientManager = context.actorOf(
+    props = Props(new JenkinsClientManager(sprayCanHttpClientActor, config.jenkinsConfig)),
+    name = "jenkins-client"
+  )
+
   override def preStart() {
 
-    val sprayConduit = context.actorOf(
-      props = Props(new SprayHttpClientActor(sprayCanHttpClientActor, config.jenkinsConfig)),
-      name = "http-client"
-    )
 
     val namingActor = context.actorOf(Props(new NameGeneratingActor(config.karotzConfig)), "namingGenerator")
 
@@ -42,7 +43,7 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
       val akkaJobName = jobConfig.name.replace(' ', '_');
 
 
-      val buildStatusMonitoringActor = context.actorOf(Props(new BuildStatusMonitoringActor(sprayConduit, config.jenkinsConfig, jobConfig)),
+      val buildStatusMonitoringActor = context.actorOf(Props(new BuildStatusMonitoringActor(jenkinsClientManager, config.jenkinsConfig, jobConfig)),
         "buildStatusMonitor_for_'"+akkaJobName+"'");
 
       val buildStateActor = context.actorOf(Props(new BuildStateActor(buildStatusMonitoringActor)),

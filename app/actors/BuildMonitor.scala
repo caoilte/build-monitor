@@ -5,12 +5,13 @@ import cc.spray.can.client.HttpClient
 import com.typesafe.config.ConfigFactory
 import config.GlobalConfig
 import cc.spray.io.IOBridge
+import karotz.KarotzClientManager.ShutdownComplete
 import play.api.libs.concurrent.Akka
 import akka.util.Timeout
 import akka.dispatch.Await
 import akka.util.duration._;
 import akka.pattern.ask
-import actors.BuildMonitoringSupervisor.ShutdownRequest
+import actors.BuildMonitoringSupervisor.{ShutdownRequest}
 
 class BuildMonitor {
 
@@ -44,10 +45,15 @@ class BuildMonitor {
 
 
   def shutdown() = {
+    println("Build Monitor shutting down")
     implicit val timeout = Timeout(30 seconds);
 
     try {
-      println(Await.result(buildMonitoringSupervisor ? ShutdownRequest, timeout.duration))
+      val result = Await.result(buildMonitoringSupervisor ? ShutdownRequest, timeout.duration)
+      result match {
+        case ShutdownComplete => println("Build Monitor shutdown complete")
+        case error => println("Something went wrong with shutdown process '"+error+"'")
+      }
     } catch {
       case e ⇒ {
         println("This error occured: "+e.getMessage)

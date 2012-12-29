@@ -37,6 +37,7 @@ object KarotzThroughputManager {
 
   sealed trait Data;
   case object StartupData extends Data;
+  case class ShutdownData(originalSender: ActorRef) extends Data;
 
   case class KarotzClientData(karotzClientManager: ActorRef, karotzActionDeadline: Deadline,
                               currentLedColour: Option[LedColour], permanentColourDeadLine: Option[Deadline]) extends Data {
@@ -93,10 +94,13 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
 
       goto(WaitingForKarotzClientReply) using new KarotzClientData(karotzClientManager, 13.minutes.fromNow)
     }
-  }
 
-  when(Shutdown) {
-    case (Event(event, data)) => stay()
+    case Event(Terminated(failedRef), ShutdownData(originalSender)) => {
+      backOff = backOff.reset()
+      log.error("Karotz Client Manager Failed before Shutdown Request could be sent.")
+      originalSender ! ShutdownComplete
+      goto(Uninitialised) using StartupData
+    }
   }
 
   when(WaitingForFunnelReply) {
@@ -156,7 +160,7 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
     goto(WaitingForFunnelReply)
   }
 
-  when(WaitingForKarotzClientReply) { //, stateTimeout = 30 seconds) {
+  when(WaitingForKarotzClientReply) {
     case Event(InteractiveModeStarted, data) => {
       ledStateActor ! LedStateRequest
       goto(WaitingForFunnelReply) using new KarotzClientData(sender, 13.minutes.fromNow)
@@ -165,24 +169,19 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
       log.info("karotz reply processed")
       goto(WaitingForFunnelPoll)
     }
-//    case Event(StateTimeout, KarotzClientData(karotzClientManager, karotzActionDeadline, currentLedColour, permanentColourDeadline)) => {
-//      log.warning("Timed out waiting for Karotz to reply to a message. Will abandon.")
-//      karotzClientManager ! StartInteractiveMode
-//      goto(Uninitialised) using StartupData
-//    }
   }
 
   whenUnhandled {
     case Event(Terminated(failedRef), data) => {
       backOff = backOff.nextBackOff
-      log.error("Karotz Client Manager Failed. This is the {} failure. Scheduling restart in {}", backOff.retries, backOff.waitTime)
+      log.error("Karotz Client Manager Failed. This is failure number {}. Scheduling restart in {}", backOff.retries, backOff.waitTime)
       context.system.scheduler.scheduleOnce(backOff.waitTime, self, Initialise)
       goto(Uninitialised) using StartupData
     }
     case Event(ShutdownRequest, data) => data match {
       case KarotzClientData(karotzClientManager, karotzActionDeadline, currentLedColour, permanentColourDeadline) => {
         karotzClientManager forward ShutdownRequest
-        goto(Uninitialised) using StartupData
+        goto(Uninitialised) using ShutdownData(sender)
       }
       case _ => {
         sender ! ShutdownComplete
@@ -194,7 +193,7 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
 
   onTransition {
     case _ -> WaitingForFunnelPoll => {
-      backOff.reset()
+      backOff = backOff.reset()
       scheduleNextFunnelPoll(nextStateData)
     }
   }

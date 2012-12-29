@@ -2,6 +2,7 @@ package actors
 
 import akka.actor._
 import config.{JobConfig, JenkinsConfig}
+import jenkins.JenkinsClientManager.{JsonReply, JsonQuery}
 import net.liftweb.json.JsonAST._
 import akka.util.duration._
 import actors.BuildStatusMonitoringActor.{RegisterStatusMonitoring, GenerateBuildStateMessage}
@@ -19,22 +20,17 @@ import config.JobConfig
 import net.liftweb.json.JsonAST.JString
 import net.liftweb.json.JsonAST.JInt
 import com.typesafe.config.{ConfigFactory, Config}
-import actors.SprayHttpClientActor.{JsonQuery, JsonReply}
-import actors.SprayHttpClientActor.JsonReply
 import actors.BuildStatusMonitoringActor._
 import scala.Some
-import actors.SprayHttpClientActor.JsonQuery
 import net.liftweb.json.JsonAST.JField
 import net.liftweb.json.JsonAST.JString
 import net.liftweb.json.JsonAST.JInt
-import actors.SprayHttpClientActor.JsonReply
 import actors.BuildStatusMonitoringActor.GenerateBuildStateMessage
 import actors.BuildStatusMonitoringActor.HandleBuildInformationResponse
 import actors.BuildStatusMonitoringActor.RegisterStatusMonitoring
 import actors.BuildStatusMonitoringActor.Data
 import scala.Some
 import actors.BuildStatusMonitoringActor.State
-import actors.SprayHttpClientActor.JsonQuery
 import net.liftweb.json.JsonAST.JField
 import actors.BuildStatusMonitoringActor.Listener
 import net.liftweb.json.JsonAST.JString
@@ -117,8 +113,10 @@ class BuildStatusMonitoringActor(httpClient: ActorRef, jenkinsConfig: JenkinsCon
     }
     case Event(QueryLatestBuild, _) => {
 
+      httpClient ! JsonQuery(lastBuildUrl)
+
       implicit val timeout = Timeout(60 seconds)
-      val lastBuildFuture = ask(httpClient, JsonQuery(lastBuildUrl, jenkinsConfig.userName, jenkinsConfig.password))
+      val lastBuildFuture = ask(httpClient, JsonQuery(lastBuildUrl))
 
       val resultMessageFuture: Future[HandleLatestBuildResponse] = for {
         lastBuildJson <- lastBuildFuture.mapTo[JsonReply]
@@ -184,7 +182,7 @@ class BuildStatusMonitoringActor(httpClient: ActorRef, jenkinsConfig: JenkinsCon
   def queryBuildInformation {
     implicit val timeout = Timeout(60 seconds)
 
-    val allBuildsFuture = ask(httpClient, JsonQuery(allBuildsUrl, jenkinsConfig.userName, jenkinsConfig.password))
+    val allBuildsFuture = ask(httpClient, JsonQuery(allBuildsUrl))
 
     val resultMessageFuture: Future[HandleBuildInformationResponse] = for {
       allBuildsJson <- allBuildsFuture.mapTo[JsonReply]

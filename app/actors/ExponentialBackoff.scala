@@ -9,7 +9,9 @@ case class ExponentialBackOff(slotTime: FiniteDuration, ceiling: Int = 10, stayA
   def isStarted = retries > 0
 
   def reset(): ExponentialBackOff = {
-    copy(slot = 1, waitTime = Duration.Zero, resets = resets + 1, retries = 0)
+    if (slot > 1) {
+      copy(slot = 1, waitTime = Duration.Zero, resets = resets + 1, retries = 0)
+    } else this
   }
 
   def nextBackOff: ExponentialBackOff = {

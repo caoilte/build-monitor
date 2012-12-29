@@ -81,6 +81,7 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
 
   def shutdown(onCompleteListener: ActorRef) = {
     client.disconnect();
+    log.info("Disconnected from Karotz. Karotz Shutdown Complete")
     onCompleteListener ! ShutdownComplete
     goto(KarotzShutdownCompleted);
   }
@@ -96,11 +97,11 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
     (f.get(client)).asInstanceOf[String];
   }
 
-  class AkkaVoosMsgCallback extends VoosMsgCallback {
+  class AkkaVoosMsgCallback(callback: Any = KarotzMessageProcessed) extends VoosMsgCallback {
     def onVoosMsg(msg: VoosMsg) {
       val responseCode = msg.getEvent().getCode();
       if (responseCode.equals(VReturnCode.OK)) {
-        self ! KarotzMessageProcessed
+        self ! callback
         log.info("Karotz Reply successfully processed");
       } else if (responseCode.equals(VReturnCode.TERMINATED)) {
         // do nothing
@@ -140,7 +141,8 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
 
   private def shutdown(): Unit = {
     val voosMsg:VoosMsg = VoosMsg.newBuilder().setId(UUID.randomUUID().toString()).setInteractiveId(getInteractiveId()).setInteractiveMode(InteractiveMode.newBuilder().setAction(Action.STOP).build()).build()
-    client.send(voosMsg, new AkkaVoosMsgCallback);
+    log.info("Sending Shutdown Request to Karotz")
+    client.send(voosMsg, new AkkaVoosMsgCallback(ShutdownComplete));
   }
 
   when(Initialised) {
@@ -169,11 +171,19 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
     case Event(StateTimeout, data) => {
       throw new KarotzIOTimedOut
     }
+    case Event(ShutdownRequest, data) => {
+      shutdown()
+      goto (WaitingForInteractiveModeToStop) using (ShutdownData(sender))
+    }
   }
 
 
   when(WaitingForInteractiveModeToStop) {
-    case Event(KarotzMessageProcessed, ShutdownData(onCompleteListener)) => shutdown(onCompleteListener)
+    case Event(ShutdownComplete, ShutdownData(onCompleteListener)) => shutdown(onCompleteListener)
+    case Event(event, data) => {
+      log.warning("Event occurred while waiting for Shutdown to Complete. Will ignore.")
+      stay()
+    }
   }
 
 }
