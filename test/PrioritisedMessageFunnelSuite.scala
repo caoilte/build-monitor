@@ -3,7 +3,6 @@ import akka.actor.{ActorRef, Actor, ActorSystem}
 import akka.dispatch.Await
 import akka.testkit.{ImplicitSender, TestKit, TestActorRef}
 import akka.util.{Deadline, Duration, Timeout}
-import karotz.KarotzClient.GreenLed
 import org.scalatest.{BeforeAndAfterAll, WordSpec}
 import org.scalatest.matchers.MustMatchers
 import akka.util.duration._

@@ -14,6 +14,7 @@ import actors.messaging.NameGeneratingActor.NamesStringReply
 import actors.PrioritisedMessageFunnel.HighPriorityMessage
 import actors.PrioritisedMessageFunnel.LowPriorityMessage
 import actors.karotz.Karotz._
+import collection.immutable.HashSet
 
 object MessageGeneratingActor {
   case class FormatMessage(formatMessage: String, args: String*)
@@ -23,25 +24,54 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
 
   implicit val timeout = Timeout(5 seconds)
 
+  private def justFixedMessage(triggeredManually: Boolean, jobName: String, authors: String) = {
+    if (triggeredManually) {
+      "Attention. The "+jobName+" build has been fixed after being manually triggered by "+authors
+    } else {
+      "Attention. The "+jobName+" build has been fixed by "+authors
+    }
+  }
+
+  private def justBrokenMessage(triggeredManually: Boolean, jobName: String, authors: String) = {
+    if (triggeredManually) {
+      "Attention. The "+jobName+" build broke after being manually triggered by "+authors
+    } else {
+      "Attention. The "+jobName+" build has been broken by "+authors
+    }
+  }
+
+  private def stillBrokenMessage(triggeredManually: Boolean, jobName: String, breakageAuthors: String,
+                                 buildsSinceLastStateChange: Int, sinceBreakageAuthors: String) = {
+    if (triggeredManually) {
+      "Attention. The "+jobName+" build was broken by " + breakageAuthors+ " and has failed "+ buildsSinceLastStateChange + " times since most " +
+        "recently after being manually triggered by " + sinceBreakageAuthors
+    } else {
+      "Attention. The "+jobName+" build was broken by " + breakageAuthors+ " and has failed "+ buildsSinceLastStateChange + " times since with " +
+        "checkins from " + sinceBreakageAuthors
+    }
+  }
+
+
+
   protected def receive = {
-    case BuildStateNotification(JustFixed, BuildStateData(buildInformation, committers)) => {
+    case BuildStateNotification(JustFixed, BuildStateData(triggeredManually, buildInformation, committers)) => {
       namingActor ? NamesStringRequest(committers.lastBuild) map {
         case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+buildInformation.jobName+" build has been fixed by "+authors)))
+          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction(justFixedMessage(triggeredManually, buildInformation.jobName, authors))))
         }
       }
     }
 
-    case BuildStateNotification(JustBroken, BuildStateData(buildInformation, committers)) => {
+    case BuildStateNotification(JustBroken, BuildStateData(triggeredManually, buildInformation, committers)) => {
       namingActor ? NamesStringRequest(committers.whoBrokeBuild) map {
         case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction("Attention. The "+buildInformation.jobName+" build has been broken by "+authors)))
+          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction(justBrokenMessage(triggeredManually, buildInformation.jobName, authors))))
         }
       }
     }
 
 
-    case BuildStateNotification(StillBroken, BuildStateData(buildInformation, committers)) => {
+    case BuildStateNotification(StillBroken, BuildStateData(triggeredManually, buildInformation, committers)) => {
       val breakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(committers.whoBrokeBuild))
       val sinceBreakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(committers.sincePreviousGoodBuild))
 
@@ -53,8 +83,21 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
         NamesStringReply(breakageAuthorsString) <- breakageAuthorsStringFuture.mapTo[NamesStringReply]
         NamesStringReply(sinceBreakageAuthorsString) <- sinceBreakageAuthorsStringFuture.mapTo[NamesStringReply]
       } yield funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
-        "Attention. The "+buildInformation.jobName+" build was broken by " + breakageAuthorsString + " and has failed "+ buildsSinceLastStateChange + " times since with " +
-          "checkins from " + sinceBreakageAuthorsString)))
+        stillBrokenMessage(triggeredManually, buildInformation.jobName, breakageAuthorsString,
+          buildsSinceLastStateChange, sinceBreakageAuthorsString))))
+    }
+
+    case BuildStateNotification(Healthy, BuildStateData(triggeredManually, buildInformation, committers)) => {
+      if (triggeredManually) {
+        namingActor ? NamesStringRequest(committers.lastBuild) map {
+          case NamesStringReply(authors) => {
+            funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
+              buildInformation.jobName+" succeeded after being manually triggered by "+authors
+            )))
+          }
+        }
+
+      }
     }
   }
 }

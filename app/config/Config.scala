@@ -5,9 +5,14 @@ import com.typesafe.config.{ConfigFactory, Config}
 import scala.collection.JavaConversions._
 import collection.breakOut
 
+trait IJenkinsConfig {
+  val url: String
+  val port: Int
+  val userName: String
+  val password: String
+}
 
-
-class JenkinsConfig(c: Config) {
+class JenkinsConfig(c: Config) extends IJenkinsConfig {
   val url = c getString "url"
   val port = c getInt "port"
   val userName = c getString "userName"
@@ -29,7 +34,11 @@ class KarotzConfig(c: Config) {
   val port = c getInt "port"
 }
 
-class JobConfig(c: Config) {
+trait IJobConfig {
+  val name: String
+}
+
+class JobConfig(c: Config) extends IJobConfig {
   val name = c getString "name"
 }
 

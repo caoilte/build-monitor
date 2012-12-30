@@ -2,7 +2,6 @@ package actors.jenkins
 
 import akka.actor.{ActorLogging, Actor, ActorRef}
 import config.{JobConfig, JenkinsConfig}
-import actors.jenkins.Query
 import actors.jenkins.JenkinsMonitoring.JenkinsMonitor
 import net.liftweb.json.JsonAST.{JNothing, JInt, JString, JValue}
 import akka.util.duration._

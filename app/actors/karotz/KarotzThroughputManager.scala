@@ -155,7 +155,7 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
   }
 
   def pollFunnelWithNextCommand(existingLedState: Option[LedColour]) = {
-    log.info("Polling for message")
+    log.debug("Polling for message")
     funnel ! ReplyWithNextKarotzCommand(existingLedState)
     goto(WaitingForFunnelReply)
   }
@@ -166,7 +166,7 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
       goto(WaitingForFunnelReply) using new KarotzClientData(sender, 13.minutes.fromNow)
     }
     case Event(KarotzMessageProcessed, data) => {
-      log.info("karotz reply processed")
+      log.debug("karotz reply processed")
       goto(WaitingForFunnelPoll)
     }
   }

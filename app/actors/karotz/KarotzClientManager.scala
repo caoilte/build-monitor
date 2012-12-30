@@ -102,7 +102,7 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
       val responseCode = msg.getEvent().getCode();
       if (responseCode.equals(VReturnCode.OK)) {
         self ! callback
-        log.info("Karotz Reply successfully processed");
+        log.debug("Karotz Reply successfully processed");
       } else if (responseCode.equals(VReturnCode.TERMINATED)) {
         // do nothing
       } else if (responseCode.equals(VReturnCode.CANCELLED)) {
