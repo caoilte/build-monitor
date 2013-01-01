@@ -1,16 +1,17 @@
 package actors.jenkins
 
 import akka.actor.{ActorRef, ActorLogging, Actor}
-import net.liftweb.json.JsonAST.JValue
 import actors.jenkins.JenkinsMonitoring._
 import actors.jenkins.JenkinsClientManager.{JsonReply, JsonQuery}
 import actors.BuildStateActor.BuildStateMessage
+import concurrent.duration.{FiniteDuration, Duration}
+import play.api.libs.json.JsValue
 
 object JenkinsMonitoring {
   trait JenkinsMonitor[T] {
     def query: String
-    def transformQueryResponse(json: JValue): Option[T]
-    def queryPeriod: akka.util.Duration
+    def transformQueryResponse(json: JsValue): Option[T]
+    def queryPeriod: FiniteDuration
   }
 
   trait JenkinsMonitoringMessage
@@ -19,12 +20,13 @@ object JenkinsMonitoring {
 }
 
 class JenkinsMonitoring(httpClient: ActorRef, monitor: JenkinsMonitor[BuildStateMessage]) extends Actor with ActorLogging {
+  import context.dispatcher
 
   var listeners:List[ActorRef] = Nil
 
   self ! Query
 
-  protected def receive = {
+  override def receive = {
     case RegisterMonitoringListener(newListener) => listeners = newListener :: listeners
     case Query => httpClient ! JsonQuery(monitor.query)
     case JsonReply(json) => {

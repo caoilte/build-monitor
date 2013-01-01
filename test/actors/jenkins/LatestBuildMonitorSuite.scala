@@ -3,7 +3,9 @@ package actors.jenkins
 import org.scalatest.WordSpec
 import org.scalatest.matchers.MustMatchers
 import config.IJobConfig
-import net.liftweb.json._
+import play.api.libs.json.Json
+
+//import net.liftweb.json._
 import scala.None
 import collection.immutable.HashSet
 import actors.BuildStateActor.{BuildSucceeded, BuildFailed}
@@ -14,14 +16,24 @@ object LatestBuildMonitorSuite {
   })
 
   val notBuildingJson =
-    parse("""{
+    Json.parse("""{
         "building" : true
        }""")
 
   val failingBuild =
-    parse(
+    Json.parse(
       """{
-           "building" : false
+           "actions" : [
+             {
+               "causes" : [
+                 {
+                  "shortDescription" : "Started by an SCM change",
+                  "userName" : "caoilte"
+                 }
+               ]
+             }
+           ],
+           "building" : false,
            "number" : 5,
            "result" : "FAILURE",
            "changeSet" : {
@@ -33,7 +45,7 @@ object LatestBuildMonitorSuite {
                 "author" : { "fullName" : "ben" }
               }
               ]
-           }
+           },
            "culprits" : [
               { "fullName" : "caoilte" },
               { "fullName" : "ben" },
@@ -43,16 +55,19 @@ object LatestBuildMonitorSuite {
       """)
 
   val passingBuild =
-    parse(
+    Json.parse(
       """{
            "actions" : [
               {
                 "causes" : [
-                  { "shortDescription" : "Started by an SCM change" }
+                  {
+                    "shortDescription" : "Started by an SCM change",
+                    "userName" : "caoilte"
+                  }
                 ]
               }
            ],
-           "building" : false
+           "building" : false,
            "number" : 3,
            "result" : "SUCCESS",
            "changeSet" : {
@@ -61,7 +76,12 @@ object LatestBuildMonitorSuite {
                 "author" : { "fullName" : "caoilte" }
               }
               ]
-           }
+           },
+           "culprits" : [
+              { "fullName" : "caoilte" },
+              { "fullName" : "ben" },
+              { "fullName" : "bruce" }
+           ]
          }
       """)
 
@@ -85,22 +105,22 @@ class LatestBuildMonitorSuite extends WordSpec with MustMatchers {
     "asked to transform a failed build with two committers and a history of three committers" must {
       val buildState = latestBuildMonitor.transformQueryResponse(failingBuild).asInstanceOf[Option[BuildFailed]].get
       "correctly return the build number" in {
-        assert(buildState.buildNumber === 5)
+        assert(buildState.details.buildNumber === 5)
       }
       "return the most recent committers as a hashset" in {
-        assert(buildState.committersThisBuild === new HashSet() + "caoilte" + "ben")
+        assert(buildState.details.committersThisBuild === new HashSet() + "caoilte" + "ben")
       }
       "return the committers since the previous good build as a hashset" in {
-        assert(buildState.committersSincePreviousGoodBuild === new HashSet() + "caoilte" + "ben" + "bruce")
+        assert(buildState.details.committersSincePreviousGoodBuild === new HashSet() + "caoilte" + "ben" + "bruce")
       }
     }
     "asked to transform a passing build with one committer" must {
       val buildState = latestBuildMonitor.transformQueryResponse(passingBuild).asInstanceOf[Option[BuildSucceeded]].get
       "correctly return the build number" in {
-        assert(buildState.buildNumber === 3)
+        assert(buildState.details.buildNumber === 3)
       }
       "return the most recent committers as a hashset" in {
-        assert(buildState.committersThisBuild === new HashSet() + "caoilte")
+        assert(buildState.details.committersThisBuild === new HashSet() + "caoilte")
       }
     }
   }

@@ -1,18 +1,19 @@
 import actors._
 import akka.actor.{ActorRef, Actor, ActorSystem}
-import akka.dispatch.Await
+
+import akka.util.Timeout
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import akka.testkit.{ImplicitSender, TestKit, TestActorRef}
-import akka.util.{Deadline, Duration, Timeout}
 import org.scalatest.{BeforeAndAfterAll, WordSpec}
 import org.scalatest.matchers.MustMatchers
-import akka.util.duration._
 import akka.pattern.ask
 
 import PrioritisedMessageFunnel._;
 
 object PrioritisedMessageFunnelSuite {
   class MessageForwarder extends Actor {
-    protected def receive = {
+    override def receive = {
       case (forwardAddress: ActorRef, message: PrioritisedMessage) => forwardAddress ! message
     }
   }

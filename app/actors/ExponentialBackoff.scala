@@ -1,6 +1,7 @@
 package actors
 
-import akka.util.{Duration, FiniteDuration}
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import util.Random
 
 case class ExponentialBackOff(slotTime: FiniteDuration, ceiling: Int = 10, stayAtCeiling: Boolean = false,

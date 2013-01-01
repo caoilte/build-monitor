@@ -1,0 +1,17 @@
+@(speakForm: Form[String])
+
+@import helper._
+
+@main("Speech Index") {
+
+<h2>Say something</h2>
+
+    @form(routes.Application.doSpeak) {
+
+        @inputText(speakForm("text"))
+
+        <input type="submit" value="Submit">
+
+    }
+
+}

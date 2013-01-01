@@ -71,7 +71,7 @@ class PrioritisedMessageFunnel extends Actor with ActorLogging {
   var highPriorityCommands = new SingleMessageQueue();
   var lowPriorityCommands = new MappedMessageQueue();
 
-  protected def receive = LoggingReceive {
+  override def receive = LoggingReceive {
     case LowPriorityMessage(message) => lowPriorityCommands.addMessage(sender, message)
     case HighPriorityMessage(message) => highPriorityCommands.addMessage(sender, message)
     case ReplyWithNextKarotzCommand(existingLedState) => {

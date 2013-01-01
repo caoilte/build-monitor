@@ -19,9 +19,10 @@ class NameGeneratingActor(karotzConfig: KarotzConfig) extends Actor with ActorLo
     map
   }
 
-  protected def receive = {
+  override def receive = {
     case NamesStringRequest(namesSet) => {
       val names = namesSet.flatMap(nameMap.get(_)).toList
+
       val namesString = names match {
         case list :: tail => generateNameString(new StringBuilder(), names);
         case Nil => {

@@ -2,43 +2,40 @@ package actors.jenkins
 
 import akka.actor._
 import config.JenkinsConfig
-import cc.spray.client.HttpConduit
+import spray.client.HttpConduit
 import akka.util.Timeout
-import cc.spray.client.HttpConduit._
-import cc.spray.http.{HttpResponse, BasicHttpCredentials}
+import spray.client.HttpConduit._
+import spray.http.{HttpResponse, BasicHttpCredentials}
 import java.net.URI
 import akka.event.LoggingReceive
-import akka.dispatch.Future
 import akka.pattern.AskTimeoutException
 import akka.actor.FSM.Failure
 import java.lang.String
 import scala.Predef._
-import net.liftweb.json._
-import cc.spray.http.HttpResponse
+import spray.http.HttpResponse
 import akka.actor.FSM.Failure
 import actors.jenkins.JenkinsClientManager._
 import akka.actor.FSM.Failure
-import cc.spray.http.HttpResponse
-import net.liftweb.json.JsonAST.JValue
-import akka.util.duration._
-import akka.util.{Deadline, Timeout}
+import spray.http.HttpResponse
+import concurrent.{Future, Await}
+import scala.concurrent.duration._
 import actors.ExponentialBackOff
 import akka.actor.FSM.Failure
-import cc.spray.http.HttpResponse
+import spray.http.HttpResponse
 import actors.ExponentialBackOff
 import collection.immutable.HashSet
 import akka.actor.FSM.Failure
 import scala.Some
-import cc.spray.http.HttpResponse
+import spray.http.HttpResponse
 import actors.ExponentialBackOff
 import actors.jenkins.JenkinsClientManager.JsonReply
 import actors.jenkins.JenkinsClientManager.TrackedQuery
-import akka.actor.FSM.Failure
 import scala.Some
-import cc.spray.http.HttpResponse
 import actors.ExponentialBackOff
 import actors.jenkins.JenkinsClientManager.JsonQuery
 import actors.jenkins.JenkinsClientManager.DoJsonReply
+import akka.actor._
+import play.api.libs.json.{Json, JsValue}
 
 object JenkinsClientManager {
   case class TrackedQuery(originalSender:ActorRef, query: String)
@@ -56,7 +53,7 @@ object JenkinsClientManager {
 
   abstract class HttpClientActorMessage
   case class JsonQuery(query: String) extends HttpClientActorMessage
-  case class JsonReply(json: JValue) extends HttpClientActorMessage
+  case class JsonReply(json: JsValue) extends HttpClientActorMessage
 
   case class DoJsonReply(originalSender: ActorRef, response: HttpResponse) extends HttpClientActorMessage
   case class JsonQueryFailed(originalSender: ActorRef, query: String) extends HttpClientActorMessage
@@ -65,6 +62,7 @@ object JenkinsClientManager {
 }
 
 class JenkinsClientManager(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) extends Actor with FSM[State, Data] {
+  import context.dispatcher
 
   startWith(ClosedCircuit, ClosedCircuitData(ExponentialBackOff(2 seconds, 12, true)))
 
@@ -92,7 +90,8 @@ class JenkinsClientManager(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) e
     case Event(DoJsonReply(originalSender, response), data) => {
       val json = new String(response.entity.asString)
 
-      originalSender ! JsonReply(parse(json))
+
+      originalSender ! JsonReply(Json.parse(json))
       stay()
     }
     case Event(JsonQueryFailed(originalSender, query), ClosedCircuitData(backOff)) => {
@@ -128,7 +127,7 @@ class JenkinsClientManager(httpClient: ActorRef, jenkinsConfig: JenkinsConfig) e
     case Event(DoJsonReply(originalSender, response), openCircuitData: OpenCircuitData) => {
       val json = new String(response.entity.asString)
 
-      originalSender ! JsonReply(parse(json))
+      originalSender ! JsonReply(Json.parse(json))
 
       log.info("Succeeded in sending single request to Jenkins Client while in half open state. Will now fully close circuit and resend all previously failed requests")
       openCircuitData.blockedQueries.foreach(trackedQuery => doQuery(trackedQuery.originalSender, trackedQuery.query))

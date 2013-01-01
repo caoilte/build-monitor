@@ -4,9 +4,10 @@ import akka.actor._
 import actors.karotz.KarotzThroughputManager.{State, Data}
 import actors.karotz.KarotzClientManager._
 import actors.LedStateActor.LedStateRequest
-import akka.util.{Duration, Deadline, Timeout}
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import actors.karotz.Karotz._
-import akka.util.duration._
 import actors.karotz.Karotz.KarotzMessage
 import actors.karotz.Karotz.LightPulseAction
 import scala.Some
@@ -58,6 +59,7 @@ object KarotzThroughputManager {
 
 
 class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledStateActor: ActorRef) extends Actor with FSM[State, Data] {
+  import context.dispatcher
   import KarotzThroughputManager._
 
   startWith(Uninitialised, StartupData)
@@ -80,7 +82,10 @@ class KarotzThroughputManager(karotzClientProps: Props, funnel: ActorRef, ledSta
 
     }
 
-    case _: Exception ⇒ Stop
+    case e: Exception ⇒ {
+      log.error("Something unexpected went wrong {}", e)
+      Stop
+    }
   }
 
   self ! Initialise

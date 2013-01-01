@@ -4,8 +4,7 @@ import scala.Some
 ;
 
 object Global extends GlobalSettings {
-
-  var buildMonitor: Option[BuildMonitor] = None;
+  import actors.BuildMonitor.buildMonitor
 
   override def onStart(app: Application) {
     Logger.info("Application has started")

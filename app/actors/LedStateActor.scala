@@ -1,8 +1,8 @@
 package actors
 
 import akka.actor.{FSM, ActorRef, ActorLogging, Actor}
-import akka.util.{Deadline, Timeout}
-import akka.util.duration._
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import collection.immutable.HashMap
 import actors.BuildStateActor._
 import karotz.Karotz._

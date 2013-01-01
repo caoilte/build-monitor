@@ -1,8 +1,9 @@
 package actors.messaging
 
 import akka.actor.{ActorLogging, ActorRef, Actor}
-import akka.util.duration._
-import akka.util.Timeout
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import akka.pattern.ask
 import actors.messaging.NameGeneratingActor.{NamesStringReply, NamesStringRequest}
 import akka.actor.FSM.Transition
@@ -15,12 +16,14 @@ import actors.PrioritisedMessageFunnel.HighPriorityMessage
 import actors.PrioritisedMessageFunnel.LowPriorityMessage
 import actors.karotz.Karotz._
 import collection.immutable.HashSet
+import akka.util.Timeout
 
 object MessageGeneratingActor {
   case class FormatMessage(formatMessage: String, args: String*)
 }
 
 class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Actor with ActorLogging {
+  import context.dispatcher
 
   implicit val timeout = Timeout(5 seconds)
 
@@ -43,8 +46,8 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
   private def stillBrokenMessage(triggeredManually: Boolean, jobName: String, breakageAuthors: String,
                                  buildsSinceLastStateChange: Int, sinceBreakageAuthors: String) = {
     if (triggeredManually) {
-      "Attention. The "+jobName+" build was broken by " + breakageAuthors+ " and has failed "+ buildsSinceLastStateChange + " times since most " +
-        "recently after being manually triggered by " + sinceBreakageAuthors
+      "Attention. The "+jobName+" build was broken by " + breakageAuthors+ " and has failed "+ buildsSinceLastStateChange + " times since. The most " +
+        "recent build failure was manually triggered by " + sinceBreakageAuthors
     } else {
       "Attention. The "+jobName+" build was broken by " + breakageAuthors+ " and has failed "+ buildsSinceLastStateChange + " times since with " +
         "checkins from " + sinceBreakageAuthors
@@ -53,7 +56,7 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
 
 
 
-  protected def receive = {
+  override def receive = {
     case BuildStateNotification(JustFixed, BuildStateData(triggeredManually, buildInformation, committers)) => {
       namingActor ? NamesStringRequest(committers.lastBuild) map {
         case NamesStringReply(authors) => {

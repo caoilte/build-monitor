@@ -3,8 +3,8 @@ package actors.karotz
 import net.violet.karotz.client.{Lang, KarotzIOHandler, Client}
 import config.KarotzConfig
 import akka.actor.{ActorRef, FSM, Actor}
-import akka.util.duration._
-import akka.util.{Deadline, Timeout}
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import net.violet.voos.message.MessageManager.{VReturnCode, InteractiveMode, VoosMsg}
 import java.util.UUID
 import net.violet.voos.message.MessageManager.InteractiveMode.Action
@@ -53,7 +53,7 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
 
   val ioHandler = new KarotzIOHandler {
     override def exceptionCaught(session: IoSession, cause: Throwable) {
-      self ! KarotzMessageFailedToProcess
+      self ! KarotzMessageFailedToProcess(session, cause)
     }
   }
 
