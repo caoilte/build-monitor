@@ -73,6 +73,7 @@ class KarotzClientManager(config: KarotzConfig) extends Actor with FSM[State, Da
         sender ! InteractiveModeStarted
         goto(Initialised)
       } else {
+        client.disconnect()
         throw new InteractiveModeFailedToStart
       }
     }

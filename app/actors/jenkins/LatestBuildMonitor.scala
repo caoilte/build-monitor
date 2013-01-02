@@ -17,19 +17,19 @@ import actors.BuildStateActor.BuildFailed
 import scala.Some
 
 object LatestBuildMonitor {
-  case class Cause(shortDescription: String, userName: String)
+  case class Cause(shortDescription: String, userName: Option[String])
   case class FullName(fullName: String)
   case class LatestBuild(isBuilding: Boolean, causes: List[Cause], buildNumber: Int,
                           result: String, committersThisBuild: List[String],
                           committersSincePreviousGoodBuild: List[String]) {
     def triggerCause: String = causes(0).shortDescription
-    def triggerUser: String = causes(0).userName
+    def triggerUser: String = causes(0).userName.getOrElse("")
   }
 
 
   implicit val causeReads = (
     (__ \ "shortDescription").read[String] ~
-      (__ \ "userName").read[String]
+      (__ \ "userName").readOpt[String]
     )(Cause)
 
   implicit val fullNameReads = (
@@ -77,7 +77,8 @@ class LatestBuildMonitor(jobConfig: IJobConfig) extends JenkinsMonitor[BuildStat
 
   private def transformCompletedBuild(latestBuild: LatestBuild) = {
 
-    val triggeredManually = !latestBuild.triggerCause.equals("Started by an SCM change")
+    val triggeredManually = !(latestBuild.triggerCause.equals("Started by an SCM change")
+      || latestBuild.triggerCause.startsWith("Started by upstream project"))
     val triggerUsers = if (!triggeredManually) {
       new HashSet() ++ latestBuild.committersThisBuild
     } else {
