@@ -9,9 +9,10 @@ object BuildStateActor {
   // received events
 
   abstract class BuildStateMessage
-  case class BuildInformation(jobName: String, lastBuildNumber: Int, lastSuccessfulBuildNumber: Int = 0, lastFailedBuildNumber: Int = 0) extends BuildStateMessage {
-    def updateWithSuccessfulBuildNumber(successfulBuildNumber: Int) = BuildInformation(jobName, successfulBuildNumber, successfulBuildNumber, lastFailedBuildNumber)
-    def updateWithFailedBuildNumber(failedBuildNumber: Int) = BuildInformation(jobName, failedBuildNumber, lastSuccessfulBuildNumber, failedBuildNumber)
+  case class BuildInformation(jobName: String, lastBuildNumber: Int, lastSuccessfulBuildNumber: Int = 0, lastFailedBuildNumberOpt: Option[Int]) extends BuildStateMessage {
+    def lastFailedBuildNumber = lastFailedBuildNumberOpt.getOrElse(0)
+    def updateWithSuccessfulBuildNumber(successfulBuildNumber: Int) = BuildInformation(jobName, successfulBuildNumber, successfulBuildNumber, lastFailedBuildNumberOpt)
+    def updateWithFailedBuildNumber(failedBuildNumber: Int) = BuildInformation(jobName, failedBuildNumber, lastSuccessfulBuildNumber, lastFailedBuildNumberOpt)
 
     def isJustFixed = {
       lastBuildNumber == lastSuccessfulBuildNumber &&
