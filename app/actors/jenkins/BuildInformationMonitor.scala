@@ -19,7 +19,7 @@ object BuildInformationMonitor {
     (__ \ "description").read[String] ~
     (__ \ "lastBuild" \ "number").read[Int] ~
     (__ \ "lastSuccessfulBuild" \ "number").read[Int] ~
-    (__ \ "lastFailedBuild" \ "number").read[Int]
+    (__ \ "lastFailedBuild" \ "number").readOpt[Int]
     )(BuildInformation)
 }
 
