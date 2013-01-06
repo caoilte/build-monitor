@@ -29,6 +29,10 @@ class NameGeneratingActor(karotzConfig: KarotzConfig) extends Actor with ActorLo
           "hmmmmmm. some mysterious person who i do not recognise."
         };
       }
+      if (names.size < namesSet.size) {
+        val noNameMappings = namesSet.filter(!nameMap.contains(_))
+        log.warning("No name mapping was found for the following user names {}", noNameMappings)
+      }
       sender ! NamesStringReply(namesString);
     }
   }

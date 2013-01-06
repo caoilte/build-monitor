@@ -19,11 +19,17 @@ import scala.Some
 object LatestBuildMonitor {
   case class Cause(shortDescription: String, userName: Option[String])
   case class FullName(fullName: String)
-  case class LatestBuild(isBuilding: Boolean, causes: List[Cause], buildNumber: Int,
+  case class LatestBuild(isBuilding: Boolean, cause: Option[Cause], buildNumber: Int,
                           result: String, committersThisBuild: List[String],
                           committersSincePreviousGoodBuild: List[String]) {
-    def triggerCause: String = causes(0).shortDescription
-    def triggerUser: String = causes(0).userName.getOrElse("")
+    def triggerCause: String = cause match {
+      case Some(cause) => cause.shortDescription
+      case None => ""
+    }
+    def triggerUser: String = cause match {
+      case Some(cause) => cause.userName.getOrElse("")
+      case None => ""
+    }
   }
 
 
@@ -31,6 +37,15 @@ object LatestBuildMonitor {
     (__ \ "shortDescription").read[String] ~
       (__ \ "userName").readOpt[String]
     )(Cause)
+
+  implicit val causesReads = (
+    (__)(0).read[Cause](causeReads)
+    )
+
+  def actionCauseReads: Reads[Cause] =
+    ((__)(0) \ "causes").read[Cause](causesReads) or
+      ((__)(1) \ "causes").read[Cause](causesReads)
+
 
   implicit val fullNameReads = (
     (__ \\ "fullName").read[String]
@@ -41,7 +56,7 @@ object LatestBuildMonitor {
 
   implicit val latestBuildReads = (
     (__ \ "building").read[Boolean] ~
-    ((__ \ "actions")(0) \ "causes").lazyRead(list[Cause](causeReads)) ~
+    (__ \ "actions").readOpt[Cause](actionCauseReads) ~
       (__ \ "number").read[Int] ~
       (__ \ "result").read[String] ~
       (__ \ "changeSet" \ "items").lazyRead(list[String](fullNameReads)) ~
@@ -53,7 +68,7 @@ object LatestBuildMonitor {
 class LatestBuildMonitor(jobConfig: IJobConfig) extends JenkinsMonitor[BuildStateMessage] {
   import LatestBuildMonitor._
 
-  val log = Logger("LatestBuildMonitor")
+  val log = Logger("LatestBuildMonitor_"+jobConfig.underScoredName)
 
 
   val query = Query(jobConfig.name, "/lastBuild")

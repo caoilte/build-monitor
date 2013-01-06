@@ -26,7 +26,7 @@ object BuildInformationMonitor {
 class BuildInformationMonitor(jobConfig: JobConfig) extends JenkinsMonitor[BuildStateMessage] {
   import BuildInformationMonitor._
 
-  val log = Logger("BuildInformationMonitor")
+  val log = Logger("BuildInformationMonitor_"+jobConfig.underScoredName)
 
 
 

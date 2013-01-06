@@ -36,10 +36,12 @@ class KarotzConfig(c: Config) {
 
 trait IJobConfig {
   val name: String
+  def underScoredName: String
 }
 
 class JobConfig(c: Config) extends IJobConfig {
   val name = c getString "name"
+  def underScoredName = name.replace(' ', '_');
 }
 
 class GlobalConfig(config: Config = ConfigFactory.load()) {
