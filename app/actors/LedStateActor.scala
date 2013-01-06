@@ -28,8 +28,8 @@ class LedStateActor(funnel: ActorRef) extends Actor with ActorLogging {
 
 
   def receive = LoggingReceive {
-    case BuildStateNotification(state, BuildStateData(triggeredManually, buildInformation, committers)) => {
-      brokenBuildsMap = brokenBuildsMap + ((buildInformation.jobName, !state.isWorking));
+    case BuildStateNotification(state, bsd:BuildStateData) => {
+      brokenBuildsMap = brokenBuildsMap + ((bsd.buildInformation.jobName, !state.isWorking));
 
       sendLedMessage(state);
     }

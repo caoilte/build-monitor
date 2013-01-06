@@ -41,7 +41,7 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
 
     for (jobConfig <- config.jobs) {
 
-      val akkaJobName = jobConfig.name.replace(' ', '_');
+      val akkaJobName = jobConfig.underScoredName
 
 
       val buildInformationMonitor = context.actorOf(Props(new JenkinsMonitoring(jenkinsClientManager, new BuildInformationMonitor(jobConfig))),
@@ -59,7 +59,7 @@ class BuildMonitoringSupervisor(sprayCanHttpClientActor: ActorRef, config: Globa
     }
   }
 
-  protected def receive = {
+  override def receive = {
     case ShutdownRequest => karotzThroughputManager forward ShutdownRequest
   }
 }

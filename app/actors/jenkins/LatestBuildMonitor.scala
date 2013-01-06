@@ -21,7 +21,8 @@ object LatestBuildMonitor {
   case class FullName(fullName: String)
   case class LatestBuild(isBuilding: Boolean, cause: Option[Cause], buildNumber: Int,
                           result: String, committersThisBuild: List[String],
-                          committersSincePreviousGoodBuild: List[String]) {
+                          committersSincePreviousGoodBuild: List[String],
+                          timestamp: Long) {
     def triggerCause: String = cause match {
       case Some(cause) => cause.shortDescription
       case None => ""
@@ -32,9 +33,11 @@ object LatestBuildMonitor {
     }
   }
 
+  def trim(implicit r:Reads[String]): Reads[String] = r.map(_.trim)
+
 
   implicit val causeReads = (
-    (__ \ "shortDescription").read[String] ~
+    (__ \ "shortDescription").read[String](trim) ~
       (__ \ "userName").readOpt[String]
     )(Cause)
 
@@ -57,11 +60,12 @@ object LatestBuildMonitor {
   implicit val latestBuildReads = (
     (__ \ "building").read[Boolean] ~
     (__ \ "actions").readOpt[Cause](actionCauseReads) ~
-      (__ \ "number").read[Int] ~
-      (__ \ "result").read[String] ~
-      (__ \ "changeSet" \ "items").lazyRead(list[String](fullNameReads)) ~
-      (__ \ "culprits").lazyRead(list[String](fullNameReads))
-    )(LatestBuild)
+    (__ \ "number").read[Int] ~
+    (__ \ "result").read[String] ~
+    (__ \ "changeSet" \ "items").lazyRead(list[String](fullNameReads)) ~
+    (__ \ "culprits").lazyRead(list[String](fullNameReads)) ~
+    (__ \ "timestamp").read[Long]
+  )(LatestBuild)
 }
 
 
@@ -100,7 +104,8 @@ class LatestBuildMonitor(jobConfig: IJobConfig) extends JenkinsMonitor[BuildStat
       new HashSet() + latestBuild.triggerUser
     }
 
-    val details = BuildDetails(triggeredManually, latestBuild.buildNumber, triggerUsers, new HashSet() ++ latestBuild.committersSincePreviousGoodBuild)
+    val details = BuildDetails(latestBuild.timestamp, triggeredManually, latestBuild.buildNumber, triggerUsers,
+      new HashSet() ++ latestBuild.committersSincePreviousGoodBuild)
 
     if (!latestBuild.result.equals("FAILURE")) {
       Some(BuildSucceeded(details))

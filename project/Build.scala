@@ -12,7 +12,8 @@ object ApplicationBuild extends Build {
       "com.typesafe.akka" % "akka-testkit_2.10.0-RC1" % "2.1.0-RC1",
 
       "io.spray" % "spray-client" % "1.1-M4.2",
-      "io.spray" % "spray-io" % "1.1-M4.2"
+      "io.spray" % "spray-io" % "1.1-M4.2",
+      "org.scalaj" % "scalaj-time_2.10.0-M7" % "0.6"
 
 //      "org.parboiled" % "parboiled-scala" % "1.0.2",
 //      "org.parboiled" % "parboiled-core" % "1.0.2",

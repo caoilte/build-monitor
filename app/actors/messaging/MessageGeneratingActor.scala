@@ -57,49 +57,62 @@ class MessageGeneratingActor(namingActor: ActorRef, funnel: ActorRef) extends Ac
 
 
   override def receive = {
-    case BuildStateNotification(JustFixed, BuildStateData(triggeredManually, buildInformation, committers)) => {
-      namingActor ? NamesStringRequest(committers.lastBuild) map {
-        case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction(justFixedMessage(triggeredManually, buildInformation.jobName, authors))))
-        }
+    case BuildStateNotification(state, bsd:BuildStateData) => {
+      if (bsd.isFresh) handleFreshStateNotification(state, bsd)
+      else {
+        log.info("{} State transition to {} happened more than fifteen minutes ago so it will not be announced",
+          bsd.buildInformation.jobName, bsd)
       }
     }
+  }
 
-    case BuildStateNotification(JustBroken, BuildStateData(triggeredManually, buildInformation, committers)) => {
-      namingActor ? NamesStringRequest(committers.whoBrokeBuild) map {
-        case NamesStringReply(authors) => {
-          funnel forward HighPriorityMessage(KarotzMessage(SpeechAction(justBrokenMessage(triggeredManually, buildInformation.jobName, authors))))
-        }
-      }
-    }
+  def handleFreshStateNotification(state: State, bsd:BuildStateData) {
 
-
-    case BuildStateNotification(StillBroken, BuildStateData(triggeredManually, buildInformation, committers)) => {
-      val breakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(committers.whoBrokeBuild))
-      val sinceBreakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(committers.sincePreviousGoodBuild))
-
-
-      val buildsSinceLastStateChange = buildInformation.lastBuildNumber - buildInformation.lastSuccessfulBuildNumber
-
-
-      for {
-        NamesStringReply(breakageAuthorsString) <- breakageAuthorsStringFuture.mapTo[NamesStringReply]
-        NamesStringReply(sinceBreakageAuthorsString) <- sinceBreakageAuthorsStringFuture.mapTo[NamesStringReply]
-      } yield funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
-        stillBrokenMessage(triggeredManually, buildInformation.jobName, breakageAuthorsString,
-          buildsSinceLastStateChange, sinceBreakageAuthorsString))))
-    }
-
-    case BuildStateNotification(Healthy, BuildStateData(triggeredManually, buildInformation, committers)) => {
-      if (triggeredManually) {
-        namingActor ? NamesStringRequest(committers.lastBuild) map {
+    state match {
+      case JustFixed => {
+        namingActor ? NamesStringRequest(bsd.committers.lastBuild) map {
           case NamesStringReply(authors) => {
-            funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
-              buildInformation.jobName+" succeeded after being manually triggered by "+authors
-            )))
+            funnel forward HighPriorityMessage(KarotzMessage(SpeechAction(justFixedMessage(bsd.triggeredManually, bsd.buildInformation.jobName, authors))))
           }
         }
+      }
 
+      case JustBroken => {
+        namingActor ? NamesStringRequest(bsd.committers.whoBrokeBuild) map {
+          case NamesStringReply(authors) => {
+            funnel forward HighPriorityMessage(KarotzMessage(SpeechAction(justBrokenMessage(bsd.triggeredManually, bsd.buildInformation.jobName, authors))))
+          }
+        }
+      }
+
+
+      case StillBroken => {
+        val breakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(bsd.committers.whoBrokeBuild))
+        val sinceBreakageAuthorsStringFuture = ask(namingActor, NamesStringRequest(bsd.committers.sincePreviousGoodBuild))
+
+
+        val buildsSinceLastStateChange = bsd.buildInformation.lastBuildNumber - bsd.buildInformation.lastSuccessfulBuildNumber
+
+
+        for {
+          NamesStringReply(breakageAuthorsString) <- breakageAuthorsStringFuture.mapTo[NamesStringReply]
+          NamesStringReply(sinceBreakageAuthorsString) <- sinceBreakageAuthorsStringFuture.mapTo[NamesStringReply]
+        } yield funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
+          stillBrokenMessage(bsd.triggeredManually, bsd.buildInformation.jobName, breakageAuthorsString,
+            buildsSinceLastStateChange, sinceBreakageAuthorsString))))
+      }
+
+      case Healthy => {
+        if (bsd.triggeredManually) {
+          namingActor ? NamesStringRequest(bsd.committers.lastBuild) map {
+            case NamesStringReply(authors) => {
+              funnel forward LowPriorityMessage(KarotzMessage(SpeechAction(
+                bsd.buildInformation.jobName+" succeeded after being manually triggered by "+authors
+              )))
+            }
+          }
+
+        }
       }
     }
   }

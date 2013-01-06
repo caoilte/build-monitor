@@ -23,7 +23,7 @@ object BuildStateActor {
         lastBuildNumber ==  lastSuccessfulBuildNumber + 1
     }
   }
-  case class BuildDetails(triggeredManually: Boolean, buildNumber: Int,
+  case class BuildDetails(timestamp: Long, triggeredManually: Boolean, buildNumber: Int,
                           committersThisBuild: HashSet[String], committersSincePreviousGoodBuild: HashSet[String])
   case class BuildSucceeded(details: BuildDetails) extends BuildStateMessage
   case class BuildFailed(details: BuildDetails) extends BuildStateMessage
@@ -73,10 +73,10 @@ object BuildStateActor {
   case object NoBuildStateData extends Data {
     override def addBuildInformation(buildInformation: BuildInformation): Data = new BuildStateData(buildInformation)
   }
-  case class BuildStateData(triggeredManually: Boolean, buildInformation: BuildInformation, committers: Committers) extends Data {
+  case class BuildStateData(timestamp: Long, triggeredManually: Boolean, buildInformation: BuildInformation, committers: Committers) extends Data {
 
     def this(buildInformation: BuildInformation) {
-      this(false, buildInformation, new Committers());
+      this(0, false, buildInformation, new Committers());
     }
 
     def addBuildInformation(buildInformation: BuildInformation) = {
@@ -89,20 +89,27 @@ object BuildStateActor {
     def updateWithSuccess(buildDetails: BuildDetails) = {
       val newBuildInformation = buildInformation.updateWithSuccessfulBuildNumber(buildDetails.buildNumber)
       if (newBuildInformation.isJustFixed) {
-        BuildStateData(buildDetails.triggeredManually, newBuildInformation, committers.updateWithMoreCommitters(buildDetails))
+        BuildStateData(buildDetails.timestamp, buildDetails.triggeredManually, newBuildInformation, committers.updateWithMoreCommitters(buildDetails))
       }
       else {
-        BuildStateData(buildDetails.triggeredManually, newBuildInformation, new Committers(buildDetails))
+        BuildStateData(buildDetails.timestamp, buildDetails.triggeredManually, newBuildInformation, new Committers(buildDetails))
       }
     }
     def updateWithFailure(buildDetails: BuildDetails) = {
       val newBuildInformation = buildInformation.updateWithFailedBuildNumber(buildDetails.buildNumber)
       if (newBuildInformation.isJustBroken) {
-        BuildStateData(buildDetails.triggeredManually, newBuildInformation, new Committers(buildDetails))
+        BuildStateData(buildDetails.timestamp, buildDetails.triggeredManually, newBuildInformation, new Committers(buildDetails))
       }
       else {
-        BuildStateData(buildDetails.triggeredManually, newBuildInformation, committers.updateWithMoreCommitters(buildDetails))
+        BuildStateData(buildDetails.timestamp, buildDetails.triggeredManually, newBuildInformation, committers.updateWithMoreCommitters(buildDetails))
       }
+    }
+
+    def isFresh:Boolean = {
+      import org.scala_tools.time.Imports._
+
+      val buildTime = new DateTime(timestamp)
+      ( DateTime.now < buildTime + 15.minutes)
     }
   }
 }
@@ -122,7 +129,8 @@ class BuildStateActor extends Actor with FSM[State, Data] {
     case Event(BuildSucceeded(details), buildStateData:BuildStateData) => {
       val newBuildState = buildStateData.copy(triggeredManually = details.triggeredManually,
         committers = new Committers(details.committersThisBuild,
-        details.committersSincePreviousGoodBuild, details.committersSincePreviousGoodBuild))
+        details.committersSincePreviousGoodBuild, details.committersSincePreviousGoodBuild),
+        timestamp = details.timestamp)
       if (buildStateData.isJustFixed) {
         log.info("Build state initialised with last build number '{}' and status 'Just Fixed'", buildStateData.buildInformation.lastBuildNumber)
         goto(JustFixed) using newBuildState
@@ -134,7 +142,8 @@ class BuildStateActor extends Actor with FSM[State, Data] {
     case Event(BuildFailed(details), buildStateData:BuildStateData) => {
       val newBuildState = buildStateData.copy(triggeredManually = details.triggeredManually,
         committers = new Committers(details.committersThisBuild,
-        details.committersSincePreviousGoodBuild, details.committersSincePreviousGoodBuild))
+        details.committersSincePreviousGoodBuild, details.committersSincePreviousGoodBuild),
+        timestamp = details.timestamp)
       if (buildStateData.isJustBroken) {
         log.info("Build state initialised with last build number '{}' and status 'Just Broken'", buildStateData.buildInformation.lastBuildNumber)
         goto(JustBroken) using newBuildState
@@ -225,13 +234,15 @@ class BuildStateActor extends Actor with FSM[State, Data] {
 
   def notifyListeners(nextState: BuildStateActor.State, nextStateData: Data) = nextStateData match {
       case bsd:BuildStateData => {
-        listeningActors.foreach(_ ! BuildStateNotification(nextState, bsd))
+          listeningActors.foreach(_ ! BuildStateNotification(nextState, bsd))
       }
       case NoBuildStateData => log.info("No build data in new state so will not notify listeners of change")
     }
 
   onTransition {
-    case oldState -> newState => notifyListeners(newState, nextStateData)
+    case oldState -> newState => {
+      notifyListeners(newState, nextStateData)
+    }
   }
 
 }
