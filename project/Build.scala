@@ -7,9 +7,8 @@ object ApplicationBuild extends Build {
     val appVersion      = "1.0-SNAPSHOT"
 
     val appDependencies = Seq(
-      "io.spray" %%  "spray-json" % "1.2.2" cross CrossVersion.full,
-      "org.scalatest" %% "scalatest" % "2.0.M5b" % "test",
-      "com.typesafe.akka" % "akka-testkit_2.10.0-RC1" % "2.1.0-RC1",
+      "io.spray" %  "spray-json_2.10" % "1.2.3",
+      "com.typesafe.akka" % "akka-testkit_2.10" % "2.1.0",
 
       "io.spray" % "spray-client" % "1.1-M4.2",
       "io.spray" % "spray-io" % "1.1-M4.2",
@@ -25,8 +24,7 @@ object ApplicationBuild extends Build {
   )
 
     val main = play.Project(appName, appVersion, appDependencies).settings(
-      testOptions in Test := Nil,
-      resolvers += "spray repo" at "http://repo.spray.cc/"
+      resolvers += "spray repo" at "http://repo.spray.io/"
 
     )
 
